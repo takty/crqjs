@@ -1,0 +1,26 @@
+{
+	"name": "crqjs",
+	"version": "1.0.0",
+	"description": "The Playground for JavaScript",
+	"productName": "crqjs",
+	"main": "app/main.js",
+	"author": "Takuto Yanagida",
+	"license": "MIT",
+	"homepage": "https://github.com/takty/crqjs#readme",
+	"scripts": {
+		"start": "gulp"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/takty/crqjs.git"
+	},
+	"devDependencies": {
+		"acorn": "8.5.0",
+		"acorn-loose": "8.2.1",
+		"acorn-walk": "8.2.0",
+		"fs-extra": "^10.0.0",
+		"glob": "^7.2.0",
+		"glob-parent": ">=6.0.1",
+		"gulp": "^4.0.2"
+	}
+}
