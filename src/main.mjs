@@ -1,57 +1,35 @@
 /**
- *
- * Main (JS)
+ * Main
  *
  * @author Takuto Yanagida
- * @version 2021-02-24
- *
+ * @version 2022-08-30
  */
 
-
-'use strict';
-
-import FS from 'fs';
-import PATH from 'path';
-import PROC from 'process';
-
+import * as nfs from './lib/nfs-node.mjs';
 import Exporter from './exporter.mjs';
 
-const argv = PROC.argv;
+import { argv } from 'process';
 load(argv[2]);
 
 async function load(filePath) {
-	const text = await new Promise(resolve => {
-		FS.readFile(filePath, 'utf-8', (error, contents) => { resolve(contents); });
-	});
+	const text = await nfs.readFile(filePath);
+	if (!text) return;
 	doExportAsWebPage(filePath, text);
 }
 
-function doExportAsWebPage(filePath, text) {
+async function doExportAsWebPage(filePath, text) {
 	const expDir = _makeExportPath(filePath);
 	try {
-		_rmdirSync(expDir);
-		FS.mkdirSync(expDir);
+		await nfs.rmdirRecursive(expDir);
+		await nfs.mkdir(expDir);
 
-		const _exporter = new Exporter();
-		_exporter.exportAsWebPage(text, filePath, expDir, true);
+		const exporter = new Exporter();
+		await exporter.exportAsWebPage(text, filePath, expDir, true);
 	} catch (e) {
 	}
 }
 
 function _makeExportPath(fp) {
-	const name = PATH.basename(fp, PATH.extname(fp));
-	return PATH.join(PATH.dirname(fp), name + '.export');
-}
-
-function _rmdirSync(dirPath) {
-	if (!FS.existsSync(dirPath)) return;
-	for (let fp of FS.readdirSync(dirPath)) {
-		fp = PATH.join(dirPath, fp);
-		if (FS.lstatSync(fp).isDirectory()) {
-			_rmdirSync(fp);
-		} else {
-			FS.unlinkSync(fp);
-		}
-	}
-	FS.rmdirSync(dirPath);
+	const name = nfs.basename(fp, nfs.extname(fp));
+	return nfs.join(nfs.dirname(fp), name + '.export');
 }

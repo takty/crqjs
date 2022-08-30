@@ -1,12 +1,9 @@
 /**
- *
  * Injected Code for Communication Between User Code and Croqujs
  *
  * @author Takuto Yanagida
  * @version 2021-08-14
- *
  */
-
 
 (function () {
 	const IS_ELECTRON = window.navigator.userAgent.toLowerCase().includes('electron');

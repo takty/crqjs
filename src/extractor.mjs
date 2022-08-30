@@ -1,14 +1,9 @@
 /**
- *
- * Function Extractor (JS)
+ * Function Extractor
  *
  * @author Takuto Yanagida
- * @version 2020-09-28
- *
+ * @version 2022-08-30
  */
-
-
-'use strict';
 
 import acorn from './lib/acorn/acorn.js';
 import acorn_walk from './lib/acorn/walk.js';
