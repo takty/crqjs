@@ -1,8 +1,8 @@
 /**
- * Native File System (Node.js)
+ * File System Access (Node.js)
  *
  * @author Takuto Yanagida
- * @version 2022-08-30
+ * @version 2022-10-17
  */
 
 import FS from 'fs';
@@ -17,7 +17,7 @@ export async function readFile(path) {
 
 export async function writeFile(path, data) {
 	const r = await new Promise(resolve => {
-		FS.writeFile(path, data, err => resolve(err ? false : true));
+		FS.writeFile(path, data, err => resolve(err ? null : path));
 	});
 	return r;
 }
@@ -85,6 +85,13 @@ export function extname(path) {
 
 export function basename(path, ext) {
 	return PATH.basename(path, ext);
+}
+
+export function filePathToUrl(path, dir = null) {
+	if (dir) {
+		return PATH.basename(path);
+	}
+	return path;
 }
 
 export const sep = PATH.sep;

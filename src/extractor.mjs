@@ -2,16 +2,16 @@
  * Function Extractor
  *
  * @author Takuto Yanagida
- * @version 2022-08-30
+ * @version 2022-10-17
  */
 
-import acorn from './lib/acorn/acorn.js';
-import acorn_walk from './lib/acorn/walk.js';
+import { parse as acorn_parse } from './lib/acorn/acorn.mjs';
+import { base as acorn_walk_base } from './lib/acorn/walk.mjs';
 
 function analyze(code) {
 	function walk(node, visitors, base, state, override) {
 		if (!base) {
-			base = acorn_walk.base;
+			base = acorn_walk_base;
 		}
 		(function c(node, st, override) {
 			var type = override || node.type, found = visitors[type];
@@ -29,7 +29,7 @@ function analyze(code) {
 	let   success = true;
 
 	try {
-		const ast = acorn.parse(code, { locations: true, ecmaVersion: 'latest' });
+		const ast = acorn_parse(code, { locations: true, ecmaVersion: 'latest' });
 		walk(ast, {
 			ClassDeclaration: (node, state, c) => {
 				fnNames.push(node.id.name);
