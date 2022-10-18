@@ -123,7 +123,6 @@ class Exporter {
 						const destFn = q.split(/\/|\\/).map(e => { return e === '..' ? '_' : e; }).join(this.#fs.sep);
 						const res = await this.#fs.copyFile(this.#fs.join(bp, p), this.#fs.join(dirPath, destFn));
 						if (!res) return [false, p];
-						// pushTag(await this.#fs.filePathToUrl(this.#fs.join(dirPath, destFn), dirPath));
 						pushTag(q);
 					} else {
 						pushTag(p);
@@ -148,33 +147,85 @@ class Exporter {
 		return [r, expPath];
 	}
 
+	async exportAsPackedWebPage(codeText, filePath, dirPath, injection = false) {
+		const lines = codeText.split('\n');
+		const decs  = this._extractUseDeclarations(lines), libs = [];
+		const pushTag = (src) => { libs.push('<script src="' + src + '"></script>'); };
+		let title = 'Croqujs';
+
+		if (injection) {
+			const res     = await fetch(INJECTION);
+			const blob    = await res.blob();
+			const dataUrl = await this.#fs.fileToUrl(blob);
+			pushTag(dataUrl);
+		}
+		if (filePath) {
+			const bp = this.#fs.dirName(filePath);
+			for (let dec of decs) {
+				if (Array.isArray(dec)) {
+					const p = dec[0];
+					if (p.startsWith('http')) return [false, p];
+					const lib = await this._readAsLibraryCode(this.#fs.join(bp, p), dec[1]);
+					if (!lib) return [false, p];
+					const blob = new Blob(lib, { type: 'text/javascript' })
+					const dataUrl = await this.#fs.fileToUrl(blob);
+					pushTag(dataUrl);
+				} else {
+					const p = dec;
+					if (!p.startsWith('http')) {
+						const dataUrl = await this.#fs.filePathToDataUrl(this.#fs.join(bp, p));
+						if (typeof dataUrl !== 'string') return [false, p];
+						pushTag(dataUrl);
+					} else {
+						pushTag(p);
+					}
+				}
+			}
+			title = this.#fs.baseName(filePath, '.js');
+			title = title.charAt(0).toUpperCase() + title.slice(1);
+		} else {
+			for (let dec of decs) {
+				const p = Array.isArray(dec) ? dec[0] : dec;
+				if (!p.startsWith('http')) return [false, p];
+				pushTag(p);
+			}
+		}
+		const head = HTML_HEAD1.replace('%TITLE%', title);
+		const expPath = this.#fs.join(dirPath, 'index.html');
+		const libTagStr = libs.join('');
+		this.#userCodeOffset = HTML_HEAD1.length + libTagStr.length + HTML_HEAD2.length;
+
+		const r = await this.#fs.writeFile(expPath, [head, libTagStr, HTML_HEAD2, lines.join(EXP_EOL), HTML_FOOT].join(''));
+		return [r, expPath];
+	}
+
 
 	// -------------------------------------------------------------------------
 
 
-	// async copyLibraryOfTemplate(codeText, tempFilePath, dirPath) {
-	// 	const decs = this._extractUseDeclarations(codeText.split('\n'));
+	async copyLibraryOfTemplate(codeText, tempFilePath, dirPath) {
+		const decs = this._extractUseDeclarations(codeText.split('\n'));
 
-	// 	const bp = this.fs.dirName(tempFilePath);
-	// 	for (let dec of decs) {
-	// 		if (Array.isArray(dec)) {
-	// 			const p = dec[0];
-	// 			if (p.startsWith('http')) return [false, p];
-	// 			const destFn = this.fs.baseName(p, this.fs.extName(p)) + '.lib.js';
-	// 			const res = await this._writeLibraryImmediately(this.fs.join(bp, p), dec[1], this.fs.join(dirPath, destFn));
-	// 			if (!res) return [false, p];
-	// 		} else {
-	// 			const p = dec;
-	// 			if (p.startsWith('http')) continue;
-	// 			const destFn = dec.split(/\/|\\/).map(e => { return e === '..' ? '_' : e; }).join(this.fs.sep);
-	// 			const destPath = this.fs.join(dirPath, destFn);
-	// 			if (await this.fs.exists(destPath)) continue;
-	// 			const res = await this.fs.copyFile(this.fs.join(bp, p), destPath);
-	// 			if (!res) return [false, p];
-	// 		}
-	// 	}
-	// 	return [true];
-	// }
+		const bp = this.fs.dirName(tempFilePath);
+		for (let dec of decs) {
+			if (Array.isArray(dec)) {
+				const p = dec[0];
+				if (p.startsWith('http')) return [false, p];
+				const destFn = this.#fs.baseName(p, this.fs.extName(p)) + '.lib.js';
+				const res = await this._writeLibraryImmediately(this.fs.join(bp, p), dec[1], this.fs.join(dirPath, destFn));
+				if (!res) return [false, p];
+			} else {
+				const p = dec;
+				if (p.startsWith('http')) continue;
+				const destFn = dec.split(/\/|\\/).map(e => { return e === '..' ? '_' : e; }).join(this.fs.sep);
+				const destPath = this.#fs.join(dirPath, destFn);
+				if (await this.#fs.exists(destPath)) continue;
+				const res = await this.#fs.copyFile(this.#fs.join(bp, p), destPath);
+				if (!res) return [false, p];
+			}
+		}
+		return [true];
+	}
 
 
 	// -------------------------------------------------------------------------

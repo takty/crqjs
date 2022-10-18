@@ -45,10 +45,29 @@ export default class {
 	async filePathToUrl(path, currentDir = null) {
 		console.log('filePathToUrl: ' + path);
 
-		// const h = await this.getFileHandle(path);
-		// const file = await h.getFile();
-		// return URL.createObjectURL(file);
-		return path;
+		const h = await this.getFileHandle(path);
+		const file = await h.getFile();
+		return URL.createObjectURL(file);
+	}
+
+	async filePathToDataUrl(path) {
+		console.log('filePathToDataUrl: ' + path);
+
+		const hf   = await this.getFileHandle(path);
+		const file = await hf.getFile();
+		return await this.fileToUrl(file);
+	}
+
+	async fileToUrl(file) {
+		const read = f => {
+			return new Promise((res, rej) => {
+				const fr = new FileReader();
+				fr.addEventListener('load', () => res(fr.result));
+				fr.addEventListener('error', () => rej(fr.error));
+				fr.readAsDataURL(f);
+			});
+		};
+		return await read(file).catch(() => null);
 	}
 
 

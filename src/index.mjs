@@ -3,23 +3,32 @@ import Fsa from './lib/fsa.mjs';
 import Exporter from './exporter.mjs';
 
 window.addEventListener('DOMContentLoaded', async () => {
+	let fs = null;
+	let curPath = null;
+
 	const btn = document.getElementById('open');
 	btn.addEventListener('click', async () => {
 		const res = await showTargetPicker('Select a file and the folder contains the file.')
 		if (res) {
 			const [fh, dh] = res;
-			const file = await fh.getFile();
+			const file     = await fh.getFile();
 			const codeText = await file.text();
-			// console.log(codeText);
-			// console.log(URL.createObjectURL(file));
-			// location.href = URL.createObjectURL(file);
-			const fs = new Fsa(dh);
+
+			fs = new Fsa(dh);
 			const ex = new Exporter(fs);
-			const [r, path] = await ex.exportAsWebPage(codeText, fh.name, `/${fh.name}.export`, true);
+			const [r, path] = await ex.exportAsPackedWebPage(codeText, fh.name, `/${fh.name}.export`, true);
 			if (r) {
-				const fh = await fs.getFileHandle(path);
-				location.href = URL.createObjectURL(await fh.getFile());
+				curPath = path;
+				// const fh = await fs.getFileHandle(path);
+				// window.open(URL.createObjectURL(await fh.getFile()));
 			}
+		}
+	});
+	const btnRun = document.getElementById('run');
+	btnRun.addEventListener('click', async () => {
+		if (fs && curPath) {
+			const fh = await fs.getFileHandle(curPath);
+			window.open(URL.createObjectURL(await fh.getFile()), 'field');
 		}
 	});
 });
