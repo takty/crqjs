@@ -2,7 +2,7 @@
  * File System Access (Browser)
  *
  * @author Takuto Yanagida
- * @version 2022-10-31
+ * @version 2022-11-01
  */
 
 export default class {
@@ -25,7 +25,7 @@ export default class {
 	}
 
 	extName(path) {
-		const base = baseName(path);
+		const base = this.baseName(path);
 		const res = base.match(/^(.+?)(\.[^.]+)?$/) ?? [];
 		const [,, ext] = res.map(m => m ?? '');
 		return ext;
