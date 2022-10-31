@@ -14,8 +14,10 @@ window.addEventListener('DOMContentLoaded', async () => {
 			const codeText = await file.text();
 
 			fs = new Fsa(dh);
-			const ex = new Exporter(fs);
-			const [r, path] = await ex.exportAsWebPage(codeText, fh.name, `/${fh.name}.export`, true, true);
+			const ex  = new Exporter(fs);
+			const ext = fs.extName(fh.name);
+			const fn  = fh.name.substring(0, fh.name.length - ext.length);
+			const [r, path] = await ex.exportAsWebPage(codeText, fh.name, `/${fn}.export`, true, true);
 			if (r) {
 				curPath = path;
 			}

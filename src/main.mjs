@@ -2,18 +2,18 @@
  * Main
  *
  * @author Takuto Yanagida
- * @version 2022-10-31
+ * @version 2022-11-01
  */
 
 import Fsa from './lib/fsa-node.mjs';
 import Exporter from './exporter.mjs';
 
 import { argv } from 'process';
-const fsa = new Fsa();
+const fs = new Fsa();
 load(argv[2]);
 
 async function load(filePath) {
-	const text = await fsa.readFile(filePath);
+	const text = await fs.readFile(filePath);
 	if (!text) return;
 	doExportAsWebPage(filePath, text);
 }
@@ -21,10 +21,10 @@ async function load(filePath) {
 async function doExportAsWebPage(filePath, text) {
 	const expDir = _makeExportPath(filePath);
 	try {
-		await fsa.rmdir(expDir);
-		await fsa.mkdir(expDir);
+		await fs.rmdir(expDir);
+		await fs.mkdir(expDir);
 
-		const exporter = new Exporter(fsa);
+		const exporter = new Exporter(fs);
 		await exporter.exportAsWebPage(text, filePath, expDir, true);
 	} catch (e) {
 		console.error(e)
@@ -32,6 +32,6 @@ async function doExportAsWebPage(filePath, text) {
 }
 
 function _makeExportPath(fp) {
-	const name = fsa.baseName(fp, fsa.extName(fp));
-	return fsa.join(fsa.dirName(fp), name + '.export');
+	const name = fs.baseName(fp, fs.extName(fp));
+	return fs.join(fs.dirName(fp), name + '.export');
 }
