@@ -1,5 +1,4 @@
-import Fsa from './lib/fsa.mjs';
-// import * as nfs from './lib/nfs-node.mjs';
+import Fsa from './lib/fsa-browser.mjs';
 import Exporter from './exporter.mjs';
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -16,11 +15,9 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 			fs = new Fsa(dh);
 			const ex = new Exporter(fs);
-			const [r, path] = await ex.exportAsPackedWebPage(codeText, fh.name, `/${fh.name}.export`, true);
+			const [r, path] = await ex.exportAsWebPage(codeText, fh.name, `/${fh.name}.export`, true, true);
 			if (r) {
 				curPath = path;
-				// const fh = await fs.getFileHandle(path);
-				// window.open(URL.createObjectURL(await fh.getFile()));
 			}
 		}
 	});

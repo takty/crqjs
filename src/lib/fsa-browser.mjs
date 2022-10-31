@@ -1,8 +1,8 @@
 /**
- * File System Access
+ * File System Access (Browser)
  *
  * @author Takuto Yanagida
- * @version 2022-10-17
+ * @version 2022-10-31
  */
 
 export default class {
@@ -31,7 +31,7 @@ export default class {
 		return ext;
 	}
 
-	dirBaseName(path) {
+	#dirBaseName(path) {
 		const ps = path.split('/').map(e => e.trim()).filter(e => e.length);
 		const le = ps.pop();
 		return [ps.join('/'), le];
@@ -42,6 +42,17 @@ export default class {
 		return ps.map(e => e.replace(re, '')).filter(e => e.length).join('/');
 	}
 
+
+	// -------------------------------------------------------------------------
+
+
+	#hRoot = null;
+
+	constructor(hRoot) {
+		this.#hRoot = hRoot;
+	}
+
+
 	async filePathToUrl(path, currentDir = null) {
 		console.log('filePathToUrl: ' + path);
 
@@ -49,6 +60,10 @@ export default class {
 		const file = await h.getFile();
 		return URL.createObjectURL(file);
 	}
+
+
+	// -------------------------------------------------------------------------
+
 
 	async filePathToDataUrl(path) {
 		console.log('filePathToDataUrl: ' + path);
@@ -70,20 +85,6 @@ export default class {
 		return await read(file).catch(() => null);
 	}
 
-
-	// -------------------------------------------------------------------------
-
-
-	#hRoot = null;
-
-	constructor(hRoot) {
-		this.#hRoot = hRoot;
-	}
-
-
-	// -------------------------------------------------------------------------
-
-
 	async #getEntry(hDir, name) {
 		for await (const e of hDir.values()) {
 			if (e.name === name) {
@@ -91,19 +92,6 @@ export default class {
 			}
 		}
 		return null;
-	}
-
-	async #pathToHandle(path) {
-		const ps = path.split('/').map(e => e.trim()).filter(e => e.length);
-
-		let e = this.#hRoot;
-		for (const p of ps) {
-			e = await this.#getEntry(e, p);
-			if (null === e) {
-				return null;
-			}
-		}
-		return e;
 	}
 
 	async getFileHandle(path, options = {}) {
@@ -159,10 +147,10 @@ export default class {
 		await writable.write(text).catch(e => { res = e; });
 		await writable.close();
 		return res;
-}
+	}
 
 	async exists(path) {
-		const [dir, base] = this.dirBaseName(path);
+		const [dir, base] = this.#dirBaseName(path);
 		const hDir = await this.getDirectoryHandle(dir);
 		return hDir && null !== await this.#getEntry(hDir, base);
 	}
@@ -172,7 +160,7 @@ export default class {
 	}
 
 	async rmdir(path) {
-		const [dir, base] = this.dirBaseName(path);
+		const [dir, base] = this.#dirBaseName(path);
 		const hDir = await this.getDirectoryHandle(dir);
 		if (!hDir) return false;
 		let res = true;

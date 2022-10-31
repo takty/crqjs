@@ -2,17 +2,18 @@
  * Main
  *
  * @author Takuto Yanagida
- * @version 2022-08-30
+ * @version 2022-10-31
  */
 
-import * as nfs from './lib/nfs-node.mjs';
+import Fsa from './lib/fsa-node.mjs';
 import Exporter from './exporter.mjs';
 
 import { argv } from 'process';
+const fsa = new Fsa();
 load(argv[2]);
 
 async function load(filePath) {
-	const text = await nfs.readFile(filePath);
+	const text = await fsa.readFile(filePath);
 	if (!text) return;
 	doExportAsWebPage(filePath, text);
 }
@@ -20,16 +21,17 @@ async function load(filePath) {
 async function doExportAsWebPage(filePath, text) {
 	const expDir = _makeExportPath(filePath);
 	try {
-		await nfs.rmdirRecursive(expDir);
-		await nfs.mkdir(expDir);
+		await fsa.rmdir(expDir);
+		await fsa.mkdir(expDir);
 
-		const exporter = new Exporter();
+		const exporter = new Exporter(fsa);
 		await exporter.exportAsWebPage(text, filePath, expDir, true);
 	} catch (e) {
+		console.error(e)
 	}
 }
 
 function _makeExportPath(fp) {
-	const name = nfs.basename(fp, nfs.extname(fp));
-	return nfs.join(nfs.dirname(fp), name + '.export');
+	const name = fsa.baseName(fp, fsa.extName(fp));
+	return fsa.join(fsa.dirName(fp), name + '.export');
 }
