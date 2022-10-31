@@ -1,8 +1,8 @@
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('acorn')) :
   typeof define === 'function' && define.amd ? define(['exports', 'acorn'], factory) :
-  (global = global || self, factory((global.acorn = global.acorn || {}, global.acorn.loose = {}), global.acorn));
-}(this, (function (exports, acorn) { 'use strict';
+  (global = typeof globalThis !== 'undefined' ? globalThis : global || self, factory((global.acorn = global.acorn || {}, global.acorn.loose = {}), global.acorn));
+})(this, (function (exports, acorn) { 'use strict';
 
   var dummyValue = "✖";
 
@@ -181,13 +181,13 @@
   // Allows plugins to extend the base parser / tokenizer used
   LooseParser.BaseParser = acorn.Parser;
 
-  var lp = LooseParser.prototype;
+  var lp$2 = LooseParser.prototype;
 
   function isSpace(ch) {
     return (ch < 14 && ch > 8) || ch === 32 || ch === 160 || acorn.isNewLine(ch)
   }
 
-  lp.next = function() {
+  lp$2.next = function() {
     this.last = this.tok;
     if (this.ahead.length)
       { this.tok = this.ahead.shift(); }
@@ -203,7 +203,7 @@
     }
   };
 
-  lp.readToken = function() {
+  lp$2.readToken = function() {
     for (;;) {
       try {
         this.toks.next();
@@ -225,7 +225,7 @@
             replace = {start: e.pos, end: pos, type: acorn.tokTypes.string, value: this.input.slice(e.pos + 1, pos)};
           } else if (/regular expr/i.test(msg)) {
             var re = this.input.slice(e.pos, pos);
-            try { re = new RegExp(re); } catch (e) { /* ignore compilation error due to new syntax */ }
+            try { re = new RegExp(re); } catch (e$1) { /* ignore compilation error due to new syntax */ }
             replace = {start: e.pos, end: pos, type: acorn.tokTypes.regexp, value: re};
           } else if (/template/.test(msg)) {
             replace = {
@@ -266,7 +266,7 @@
     }
   };
 
-  lp.resetTo = function(pos) {
+  lp$2.resetTo = function(pos) {
     this.toks.pos = pos;
     var ch = this.input.charAt(pos - 1);
     this.toks.exprAllowed = !ch || /[[{(,;:?/*=+\-~!|&%^<>]/.test(ch) ||
@@ -284,7 +284,7 @@
     }
   };
 
-  lp.lookAhead = function(n) {
+  lp$2.lookAhead = function(n) {
     while (n > this.ahead.length)
       { this.ahead.push(this.readToken()); }
     return this.ahead[n - 1]
@@ -751,6 +751,7 @@
         }
       }
       node.source = this.eatContextual("from") ? this.parseExprAtom() : this.dummyString();
+      this.semicolon();
       return this.finishNode(node, "ExportAllDeclaration")
     }
     if (this.eat(acorn.tokTypes._default)) {
@@ -819,13 +820,13 @@
       while (!this.closes(acorn.tokTypes.braceR, indent + (this.curLineStart <= continuedLine ? 1 : 0), line)) {
         var elt$1 = this.startNode();
         if (this.eat(acorn.tokTypes.star)) {
-          elt$1.local = this.eatContextual("as") ? this.parseIdent() : this.dummyIdent();
+          elt$1.local = this.eatContextual("as") ? this.parseModuleExportName() : this.dummyIdent();
           this.finishNode(elt$1, "ImportNamespaceSpecifier");
         } else {
           if (this.isContextual("from")) { break }
-          elt$1.imported = this.parseIdent();
+          elt$1.imported = this.parseModuleExportName();
           if (isDummy(elt$1.imported)) { break }
-          elt$1.local = this.eatContextual("as") ? this.parseIdent() : elt$1.imported;
+          elt$1.local = this.eatContextual("as") ? this.parseModuleExportName() : elt$1.imported;
           this.finishNode(elt$1, "ImportSpecifier");
         }
         elts.push(elt$1);
@@ -846,9 +847,9 @@
     while (!this.closes(acorn.tokTypes.braceR, indent + (this.curLineStart <= continuedLine ? 1 : 0), line)) {
       if (this.isContextual("from")) { break }
       var elt = this.startNode();
-      elt.local = this.parseIdent();
+      elt.local = this.parseModuleExportName();
       if (isDummy(elt.local)) { break }
-      elt.exported = this.eatContextual("as") ? this.parseIdent() : elt.local;
+      elt.exported = this.eatContextual("as") ? this.parseModuleExportName() : elt.local;
       this.finishNode(elt, "ExportSpecifier");
       elts.push(elt);
       this.eat(acorn.tokTypes.comma);
@@ -858,9 +859,15 @@
     return elts
   };
 
-  var lp$2 = LooseParser.prototype;
+  lp$1.parseModuleExportName = function() {
+    return this.options.ecmaVersion >= 13 && this.tok.type === acorn.tokTypes.string
+      ? this.parseExprAtom()
+      : this.parseIdent()
+  };
 
-  lp$2.checkLVal = function(expr) {
+  var lp = LooseParser.prototype;
+
+  lp.checkLVal = function(expr) {
     if (!expr) { return expr }
     switch (expr.type) {
     case "Identifier":
@@ -876,7 +883,7 @@
     }
   };
 
-  lp$2.parseExpression = function(noIn) {
+  lp.parseExpression = function(noIn) {
     var start = this.storeCurrentPos();
     var expr = this.parseMaybeAssign(noIn);
     if (this.tok.type === acorn.tokTypes.comma) {
@@ -888,7 +895,7 @@
     return expr
   };
 
-  lp$2.parseParenExpression = function() {
+  lp.parseParenExpression = function() {
     this.pushCx();
     this.expect(acorn.tokTypes.parenL);
     var val = this.parseExpression();
@@ -897,7 +904,7 @@
     return val
   };
 
-  lp$2.parseMaybeAssign = function(noIn) {
+  lp.parseMaybeAssign = function(noIn) {
     // `yield` should be an identifier reference if it's not in generator functions.
     if (this.inGenerator && this.toks.isContextual("yield")) {
       var node = this.startNode();
@@ -925,7 +932,7 @@
     return left
   };
 
-  lp$2.parseMaybeConditional = function(noIn) {
+  lp.parseMaybeConditional = function(noIn) {
     var start = this.storeCurrentPos();
     var expr = this.parseExprOps(noIn);
     if (this.eat(acorn.tokTypes.question)) {
@@ -938,13 +945,13 @@
     return expr
   };
 
-  lp$2.parseExprOps = function(noIn) {
+  lp.parseExprOps = function(noIn) {
     var start = this.storeCurrentPos();
     var indent = this.curIndent, line = this.curLineStart;
     return this.parseExprOp(this.parseMaybeUnary(false), start, -1, noIn, indent, line)
   };
 
-  lp$2.parseExprOp = function(left, start, minPrec, noIn, indent, line) {
+  lp.parseExprOp = function(left, start, minPrec, noIn, indent, line) {
     if (this.curLineStart !== line && this.curIndent < indent && this.tokenStartsLine()) { return left }
     var prec = this.tok.type.binop;
     if (prec != null && (!noIn || this.tok.type !== acorn.tokTypes._in)) {
@@ -966,7 +973,7 @@
     return left
   };
 
-  lp$2.parseMaybeUnary = function(sawUnary) {
+  lp.parseMaybeUnary = function(sawUnary) {
     var start = this.storeCurrentPos(), expr;
     if (this.options.ecmaVersion >= 8 && this.toks.isContextual("await") &&
         (this.inAsync || (this.toks.inModule && this.options.ecmaVersion >= 13) ||
@@ -987,6 +994,8 @@
       this.next();
       node$1.argument = this.parseMaybeUnary(sawUnary);
       expr = this.finishNode(node$1, "SpreadElement");
+    } else if (!sawUnary && this.tok.type === acorn.tokTypes.privateId) {
+      expr = this.parsePrivateIdent();
     } else {
       expr = this.parseExprSubscripts();
       while (this.tok.type.postfix && !this.canInsertSemicolon()) {
@@ -1010,12 +1019,12 @@
     return expr
   };
 
-  lp$2.parseExprSubscripts = function() {
+  lp.parseExprSubscripts = function() {
     var start = this.storeCurrentPos();
     return this.parseSubscripts(this.parseExprAtom(), start, false, this.curIndent, this.curLineStart)
   };
 
-  lp$2.parseSubscripts = function(base, start, noCalls, startIndent, line) {
+  lp.parseSubscripts = function(base, start, noCalls, startIndent, line) {
     var optionalSupported = this.options.ecmaVersion >= 11;
     var optionalChained = false;
     for (;;) {
@@ -1086,7 +1095,7 @@
     return base
   };
 
-  lp$2.parseExprAtom = function() {
+  lp.parseExprAtom = function() {
     var node;
     switch (this.tok.type) {
     case acorn.tokTypes._this:
@@ -1190,7 +1199,7 @@
     }
   };
 
-  lp$2.parseExprImport = function() {
+  lp.parseExprImport = function() {
     var node = this.startNode();
     var meta = this.parseIdent(true);
     switch (this.tok.type) {
@@ -1205,18 +1214,18 @@
     }
   };
 
-  lp$2.parseDynamicImport = function(node) {
+  lp.parseDynamicImport = function(node) {
     node.source = this.parseExprList(acorn.tokTypes.parenR)[0] || this.dummyString();
     return this.finishNode(node, "ImportExpression")
   };
 
-  lp$2.parseImportMeta = function(node) {
+  lp.parseImportMeta = function(node) {
     this.next(); // skip '.'
     node.property = this.parseIdent(true);
     return this.finishNode(node, "MetaProperty")
   };
 
-  lp$2.parseNew = function() {
+  lp.parseNew = function() {
     var node = this.startNode(), startIndent = this.curIndent, line = this.curLineStart;
     var meta = this.parseIdent(true);
     if (this.options.ecmaVersion >= 6 && this.eat(acorn.tokTypes.dot)) {
@@ -1234,7 +1243,7 @@
     return this.finishNode(node, "NewExpression")
   };
 
-  lp$2.parseTemplateElement = function() {
+  lp.parseTemplateElement = function() {
     var elem = this.startNode();
 
     // The loose parser accepts invalid unicode escapes even in untagged templates.
@@ -1254,7 +1263,7 @@
     return this.finishNode(elem, "TemplateElement")
   };
 
-  lp$2.parseTemplate = function() {
+  lp.parseTemplate = function() {
     var node = this.startNode();
     this.next();
     node.expressions = [];
@@ -1277,7 +1286,7 @@
     return this.finishNode(node, "TemplateLiteral")
   };
 
-  lp$2.parseObj = function() {
+  lp.parseObj = function() {
     var node = this.startNode();
     node.properties = [];
     this.pushCx();
@@ -1350,7 +1359,7 @@
     return this.finishNode(node, "ObjectExpression")
   };
 
-  lp$2.parsePropertyName = function(prop) {
+  lp.parsePropertyName = function(prop) {
     if (this.options.ecmaVersion >= 6) {
       if (this.eat(acorn.tokTypes.bracketL)) {
         prop.computed = true;
@@ -1365,12 +1374,12 @@
     prop.key = key || this.dummyIdent();
   };
 
-  lp$2.parsePropertyAccessor = function() {
+  lp.parsePropertyAccessor = function() {
     if (this.tok.type === acorn.tokTypes.name || this.tok.type.keyword) { return this.parseIdent() }
     if (this.tok.type === acorn.tokTypes.privateId) { return this.parsePrivateIdent() }
   };
 
-  lp$2.parseIdent = function() {
+  lp.parseIdent = function() {
     var name = this.tok.type === acorn.tokTypes.name ? this.tok.value : this.tok.type.keyword;
     if (!name) { return this.dummyIdent() }
     var node = this.startNode();
@@ -1379,14 +1388,14 @@
     return this.finishNode(node, "Identifier")
   };
 
-  lp$2.parsePrivateIdent = function() {
+  lp.parsePrivateIdent = function() {
     var node = this.startNode();
     node.name = this.tok.value;
     this.next();
     return this.finishNode(node, "PrivateIdentifier")
   };
 
-  lp$2.initFunction = function(node) {
+  lp.initFunction = function(node) {
     node.id = null;
     node.params = [];
     if (this.options.ecmaVersion >= 6) {
@@ -1400,7 +1409,7 @@
   // Convert existing expression atom to assignable pattern
   // if possible.
 
-  lp$2.toAssignable = function(node, binding) {
+  lp.toAssignable = function(node, binding) {
     if (!node || node.type === "Identifier" || (node.type === "MemberExpression" && !binding)) ; else if (node.type === "ParenthesizedExpression") {
       this.toAssignable(node.expression, binding);
     } else if (this.options.ecmaVersion < 6) {
@@ -1430,7 +1439,7 @@
     return node
   };
 
-  lp$2.toAssignableList = function(exprList, binding) {
+  lp.toAssignableList = function(exprList, binding) {
     for (var i = 0, list = exprList; i < list.length; i += 1)
       {
       var expr = list[i];
@@ -1440,12 +1449,12 @@
     return exprList
   };
 
-  lp$2.parseFunctionParams = function(params) {
+  lp.parseFunctionParams = function(params) {
     params = this.parseExprList(acorn.tokTypes.parenR);
     return this.toAssignableList(params, true)
   };
 
-  lp$2.parseMethod = function(isGenerator, isAsync) {
+  lp.parseMethod = function(isGenerator, isAsync) {
     var node = this.startNode(), oldInAsync = this.inAsync, oldInGenerator = this.inGenerator, oldInFunction = this.inFunction;
     this.initFunction(node);
     if (this.options.ecmaVersion >= 6)
@@ -1464,7 +1473,7 @@
     return this.finishNode(node, "FunctionExpression")
   };
 
-  lp$2.parseArrowExpression = function(node, params, isAsync) {
+  lp.parseArrowExpression = function(node, params, isAsync) {
     var oldInAsync = this.inAsync, oldInGenerator = this.inGenerator, oldInFunction = this.inFunction;
     this.initFunction(node);
     if (this.options.ecmaVersion >= 8)
@@ -1486,7 +1495,7 @@
     return this.finishNode(node, "ArrowFunctionExpression")
   };
 
-  lp$2.parseExprList = function(close, allowEmpty) {
+  lp.parseExprList = function(close, allowEmpty) {
     this.pushCx();
     var indent = this.curIndent, line = this.curLineStart, elts = [];
     this.next(); // Opening bracket
@@ -1514,7 +1523,7 @@
     return elts
   };
 
-  lp$2.parseAwait = function() {
+  lp.parseAwait = function() {
     var node = this.startNode();
     this.next();
     node.argument = this.parseMaybeUnary();
@@ -1535,4 +1544,4 @@
 
   Object.defineProperty(exports, '__esModule', { value: true });
 
-})));
+}));
