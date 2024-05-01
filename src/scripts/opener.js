@@ -1,37 +1,3 @@
-import Fsa from './lib/fsa-browser.mjs';
-import Exporter from './exporter.mjs';
-
-window.addEventListener('DOMContentLoaded', async () => {
-	let fs = null;
-	let curPath = null;
-
-	const btn = document.getElementById('open');
-	btn.addEventListener('click', async () => {
-		const res = await showTargetPicker('Select a file and the folder contains the file.')
-		if (res) {
-			const [fh, dh] = res;
-			const file     = await fh.getFile();
-			const codeText = await file.text();
-
-			fs = new Fsa(dh);
-			const ex  = new Exporter(fs);
-			const ext = fs.extName(fh.name);
-			const fn  = fh.name.substring(0, fh.name.length - ext.length);
-			const [r, path] = await ex.exportAsWebPage(codeText, fh.name, `/${fn}.export`, true, true);
-			if (r) {
-				curPath = path;
-			}
-		}
-	});
-	const btnRun = document.getElementById('run');
-	btnRun.addEventListener('click', async () => {
-		if (fs && curPath) {
-			const fh = await fs.getFileHandle(curPath);
-			window.open(URL.createObjectURL(await fh.getFile()), 'field');
-		}
-	});
-});
-
 function createPicker(onClose, message) {
 	let fh = null;
 	let dh = null;
@@ -103,7 +69,7 @@ function createPicker(onClose, message) {
 	});
 }
 
-function showTargetPicker(message) {
+export function showTargetPicker(message) {
 	return new Promise(resolve => {
 		createPicker(resolve, message);
 	});

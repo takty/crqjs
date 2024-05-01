@@ -5,7 +5,7 @@
  * @version 2022-10-31
  */
 
-import analyze from './analyzer.mjs';
+import analyze from './analyzer.js';
 
 const AS_MODULE = true;
 
