@@ -1,43 +1,43 @@
 /**
- * File System Access (Browser)
+ * File System Access
  *
  * @author Takuto Yanagida
- * @version 2022-11-01
+ * @version 2024-05-01
  */
 
-export default class {
+export default class Fsa {
 
 	sep = '/';
 
-	dirName(path) {
+	dirName(path: string) {
 		const es = path.split('/').map(e => e.trim()).filter(e => e.length);
 		es.pop();
 		return es.join('/');
 	}
 
-	baseName(path, ext = null) {
+	baseName(path: string, ext: string|null = null) {
 		const ps = path.split('/').map(e => e.trim()).filter(e => e.length);
-		const le = ps.pop();
+		const le = ps.pop() ?? '';
 		if (ext && le.endsWith(ext)) {
 			return le.substring(0, le.length - ext.length);
 		}
 		return le;
 	}
 
-	extName(path) {
+	extName(path: string) {
 		const base = this.baseName(path);
 		const res = base.match(/^(.+?)(\.[^.]+)?$/) ?? [];
 		const [,, ext] = res.map(m => m ?? '');
 		return ext;
 	}
 
-	#dirBaseName(path) {
+	#dirBaseName(path: string) {
 		const ps = path.split('/').map(e => e.trim()).filter(e => e.length);
-		const le = ps.pop();
+		const le = ps.pop() ?? '';
 		return [ps.join('/'), le];
 	}
 
-	join(...ps) {
+	join(...ps: string[]) {
 		const re = new RegExp('^/+|/+$', 'g');
 		return ps.map(e => e.replace(re, '')).filter(e => e.length).join('/');
 	}
@@ -46,38 +46,44 @@ export default class {
 	// -------------------------------------------------------------------------
 
 
-	#hRoot = null;
+	#hRoot: FileSystemDirectoryHandle;
 
-	constructor(hRoot) {
+	constructor(hRoot: FileSystemDirectoryHandle) {
 		this.#hRoot = hRoot;
 	}
 
 
-	async filePathToUrl(path, currentDir = null) {
+	async filePathToUrl(path: string) {
 		console.log('filePathToUrl: ' + path);
 
-		const h = await this.getFileHandle(path);
-		const file = await h.getFile();
-		return URL.createObjectURL(file);
+		const hf = await this.getFileHandle(path);
+		if (null === hf) {
+			return '';
+		}
+		const f = await hf.getFile();
+		return URL.createObjectURL(f);
 	}
 
 
 	// -------------------------------------------------------------------------
 
 
-	async filePathToDataUrl(path) {
+	async filePathToDataUrl(path: string) {
 		console.log('filePathToDataUrl: ' + path);
 
 		const hf   = await this.getFileHandle(path);
-		const file = await hf.getFile();
-		return await this.fileToUrl(file);
+		if (null === hf) {
+			return '';
+		}
+		const f = await hf.getFile();
+		return await this.fileToUrl(f);
 	}
 
-	async fileToUrl(file) {
-		const read = f => {
+	async fileToUrl(file: Blob) {
+		const read = (f: Blob): Promise<string> => {
 			return new Promise((res, rej) => {
 				const fr = new FileReader();
-				fr.addEventListener('load', () => res(fr.result));
+				fr.addEventListener('load', () => res(fr.result as string));
 				fr.addEventListener('error', () => rej(fr.error));
 				fr.readAsDataURL(f);
 			});
@@ -85,7 +91,7 @@ export default class {
 		return await read(file).catch(() => null);
 	}
 
-	async #getEntry(hDir, name) {
+	async #getEntry(hDir: FileSystemDirectoryHandle, name: string): Promise<FileSystemHandle|null> {
 		for await (const e of hDir.values()) {
 			if (e.name === name) {
 				return e;
@@ -94,11 +100,11 @@ export default class {
 		return null;
 	}
 
-	async getFileHandle(path, options = {}) {
+	async getFileHandle(path: string, options = {}): Promise<FileSystemFileHandle|null> {
 		console.log('getFileHandle: ' + path);
 
 		const ps = path.split('/').map(e => e.trim()).filter(e => e.length);
-		const le = ps.pop();
+		const le = ps.pop() ?? '';
 
 		const e = await this.getDirectoryHandle(ps.join('/'), options);
 		if (null === e) {
@@ -107,12 +113,12 @@ export default class {
 		return await e.getFileHandle(le, options).catch(() => null);
 	}
 
-	async getDirectoryHandle(path, options = {}) {
+	async getDirectoryHandle(path: string, options = {}): Promise<FileSystemDirectoryHandle|null> {
 		console.log('getDirectoryHandle: ' + path);
 
 		const ps = path.split('/').map(e => e.trim()).filter(e => e.length);
 
-		let e = this.#hRoot;
+		let e: FileSystemDirectoryHandle|null = this.#hRoot;
 		for (const p of ps) {
 			e = await e.getDirectoryHandle(p, options).catch(() => null);
 			if (null === e) {
@@ -126,40 +132,42 @@ export default class {
 	// -------------------------------------------------------------------------
 
 
-	async readFile(path) {
+	async readFile(path: string) {
 		console.log('readFile: ' + path);
 
 		const h = await this.getFileHandle(path);
-		if (!h) return null;
-		const file = await h.getFile();
-		const text = await file.text();
-		return text;
+		if (null === h) {
+			return null;
+		}
+		const file: File = await h.getFile();
+		return await file.text();
 	}
 
-	async writeFile(path, text) {
+	async writeFile(path: string, text: string) {
 		console.log('writeFile: ' + path);
 
 		const h = await this.getFileHandle(path, { create: true });
-		if (!h) return null;
+		if (null === h) {
+			return null;
+		}
 		let res = true;
-		console.log(h);
-		const writable = await h.createWritable();
-		await writable.write(text).catch(e => { res = e; });
-		await writable.close();
+		const w = await h.createWritable();
+		await w.write(text).catch(e => { res = e; });
+		await w.close();
 		return res;
 	}
 
-	async exists(path) {
+	async exists(path: string) {
 		const [dir, base] = this.#dirBaseName(path);
 		const hDir = await this.getDirectoryHandle(dir);
 		return hDir && null !== await this.#getEntry(hDir, base);
 	}
 
-	async mkdir(path) {
+	async mkdir(path: string) {
 		return await this.getDirectoryHandle(path, { create: true });
 	}
 
-	async rmdir(path) {
+	async rmdir(path: string) {
 		const [dir, base] = this.#dirBaseName(path);
 		const hDir = await this.getDirectoryHandle(dir);
 		if (!hDir) return false;
@@ -172,15 +180,21 @@ export default class {
 	// -----------------------------------------------------------------------------
 
 
-	async copyFile(from, to) {
+	async copyFile(from: string, to: string) {
 		console.log('copyFile: ' + from + ' ' + to);
 
 		const hFileFrom = await this.getFileHandle(from);
+		if (null === hFileFrom) {
+			return false;
+		}
 		const file = await hFileFrom.getFile();
 		const text = await file.text();
 
 		let res = true;
 		const hFileTo = await this.getFileHandle(to, { create: true });
+		if (null === hFileTo) {
+			return false;
+		}
 		const writable = await hFileTo.createWritable();
 		await writable.write(text).catch(e => { res = e; });
 		await writable.close();
