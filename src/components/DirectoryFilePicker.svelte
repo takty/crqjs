@@ -1,4 +1,11 @@
 <script lang="ts">
+	/**
+	 * Directory File Picker
+	 *
+	 * @author Takuto Yanagida
+	 * @version 2024-05-02
+	 */
+
 	import { createEventDispatcher } from "svelte";
 	const dispatch = createEventDispatcher();
 
@@ -8,10 +15,15 @@
 	let hDir: FileSystemDirectoryHandle | null = null;
 	let hFns: { hFile: FileSystemFileHandle; name: string }[] = [];
 	let curIdx = 0;
+	let newFile: string | null = null;
 
 	async function selectFolder() {
-		// @ts-ignore
-		hDir = await window.showDirectoryPicker();
+		try {
+			// @ts-ignore
+			hDir = await window.showDirectoryPicker();
+		} catch (e) {
+			return;
+		}
 		if (!hDir) return;
 
 		const fns: { hFile: FileSystemFileHandle; name: string }[] = [];
@@ -24,11 +36,11 @@
 	}
 
 	function open() {
-		dispatch("close", [hDir, hFns[curIdx].hFile]);
+		dispatch("close", [hDir, hFns[curIdx].hFile, newFile]);
 	}
 
 	function cancel() {
-		dispatch("close", [null, null]);
+		dispatch("close", [null, null, null]);
 	}
 </script>
 
@@ -59,6 +71,11 @@
 					{/each}
 				</select>
 			{/if}
+
+			<div class="file-name">
+				File Name:
+				<input type="text" bind:value={newFile} />
+			</div>
 		</div>
 
 		<div class="action">
@@ -106,6 +123,24 @@
 		& div {
 			flex-grow: 1;
 			border-block-end: 1px dashed #777;
+			line-height: 1.25;
+			padding-block: 0.25rem;
+
+			width: 16rem;
+			min-height: 2rem;
+		}
+	}
+	.file-name {
+		grid-area: 4/1/5/3;
+
+		display: flex;
+		gap: 1rem;
+		width: 100%;
+
+		padding-inline-start: 1rem;
+
+		& input {
+			flex-grow: 1;
 			line-height: 1.25;
 			padding-block: 0.25rem;
 

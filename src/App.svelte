@@ -6,6 +6,7 @@
 	import Editor from "./components/Editor.svelte";
 	import DirectoryFilePicker from "./components/DirectoryFilePicker.svelte";
 
+	// let dfp: DirectoryFilePicker;
 	let fileChooser: HTMLDialogElement;
 
 	let fsa: Fsa|null = null;
@@ -13,23 +14,32 @@
 	let curPath: string|null = null;
 	let source: string;
 
-	function openDialog() {
+	let _onClose: (hDir: FileSystemDirectoryHandle | null, hFile: FileSystemFileHandle | null, fn: string|null) => void;
+
+	function openDialog(onClose: (hDir: FileSystemDirectoryHandle | null, hFile: FileSystemFileHandle | null, fn: string|null) => void) {
+		_onClose = onClose;
 		fileChooser.showModal();
 	}
 
 	async function closeDialog({
-		detail: [hDir, hFile],
+		detail: [hDir, hFile, fn],
 	}: {
-		detail: [FileSystemDirectoryHandle | null, FileSystemFileHandle | null];
+		detail: [FileSystemDirectoryHandle | null, FileSystemFileHandle | null, string|null];
 	}) {
 		fileChooser.close();
-		if (hDir && hFile) {
-			const f = await hFile.getFile();
-			source = await f.text();
+		_onClose(hDir, hFile, fn);
+	}
 
-			fsa = new Fsa(hDir);
-			fileName = hFile.name;
-		}
+	function open() {
+		openDialog(async (hDir: FileSystemDirectoryHandle | null, hFile: FileSystemFileHandle | null, fn: string|null) => {
+			if (hDir && hFile) {
+				const f = await hFile.getFile();
+				source = await f.text();
+
+				fsa = new Fsa(hDir);
+				fileName = hFile.name;
+			}
+		});
 	}
 
 	async function save() {
@@ -38,17 +48,41 @@
 		}
 	}
 
+	async function saveAs() {
+		openDialog(async (hDir: FileSystemDirectoryHandle | null, hFile: FileSystemFileHandle | null, fn: string|null) => {
+			if (hDir && fn) {
+				fsa = new Fsa(hDir);
+				fsa.writeFile(fn, source);
+			}
+		});
+	}
+
 	async function runCode() {
+		console.log(fsa);
+		console.log(fileName);
 		if (fsa !== null && fileName !== null) {
 			const ex  = new Exporter(fsa);
-			const ext = fsa.extName(fileName);
+			const ext = Fsa.extName(fileName);
 			const fn  = fileName.substring(0, fileName.length - ext.length);
-			const [r, path] = await ex.exportAsWebPage(source, fileName, `/${fn}.export`, true, true);
+			const [r, path] = await ex.exportAsWebPage(source, fileName, `/${fn}.export`, true, 'url');
 			if (r && path) {
 				curPath = path;
 			}
 			if (curPath) {
 				const fh = await fsa.getFileHandle(curPath);
+				if (null !== fh) {
+					window.open(URL.createObjectURL(await fh.getFile()), 'field');
+				}
+			}
+		} else {
+			const hDir = await navigator.storage.getDirectory();
+			const fsa = new Fsa(hDir);
+
+			const ex  = new Exporter(fsa);
+			const fn  = 'temp';
+			const [r, path] = await ex.exportAsWebPage(source, '', `/${fn}.export`, true, 'url');
+			if (r && path) {
+				const fh = await fsa.getFileHandle(path);
 				if (null !== fh) {
 					window.open(URL.createObjectURL(await fh.getFile()), 'field');
 				}
@@ -59,7 +93,7 @@
 	async function saveAsLibrary() {
 		if (fsa !== null && fileName !== null) {
 			const ex  = new Exporter(fsa);
-			const ext = fsa.extName(fileName);
+			const ext = Fsa.extName(fileName);
 			const fn  = fileName.substring(0, fileName.length - ext.length);
 			const [r, path] = await ex.exportAsLibrary(source, `${fn}.lib.js`, fn, extractFunction(source));
 		}
@@ -68,8 +102,9 @@
 
 <main>
 	<div class="action">
-		<button on:click={openDialog}>Open...</button>
+		<button on:click={open}>Open...</button>
 		<button on:click={save}>Save</button>
+		<button on:click={saveAs}>Save As...</button>
 		<button on:click={runCode}>Run</button>
 		<button on:click={saveAsLibrary}>Save as library</button>
 	</div>

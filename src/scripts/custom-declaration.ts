@@ -2,127 +2,97 @@
  * Custom Declaration
  *
  * @author Takuto Yanagida
- * @version 2024-05-02
+ * @version 2024-05-05
  */
 
-export default function extractDeclarations(lines: string[]): [string, string|null][] {
-	const USE = '@use', NEED = '@need', AS = 'as', EXT = '.js';
-	const scs: string[][] = lines.map(parseSpecialComment).filter(sc => null !== sc) as string[][];
+export default function extractDeclarations(code: string): [string, string|null][] {
+	const USE = '@use', NEED = '@need';
+	const scs: [string, string[]][] = code.split('\n').map(parseSpecialComment).filter(Boolean) as [string, string[]][];
 	const res: [string, string|null][] = [];
 
-	for (const [type, params] of scs) {
-		const items = splitSpaceSeparatedLine(params).map(unwrapQuote);
-
+	for (const [type, its] of scs) {
 		if (type === NEED) {
-			for (let item of items) {
-				if (item.indexOf(EXT) === -1) {
-					item += EXT;
-				}
-				res.push([item, null]);
-			}
+			processNeedDeclaration(its, res);
 		} else if (type === USE) {
-			let last: [string, string|null]|null = null;
-			for (let i = 0; i < items.length; i += 1) {
-				let item = items[i];
-				if (item === AS) {
-					if (last !== null && i + 1 < items.length) {
-						last[1] = items[i + 1];
-						i += 1;
-					}
-				} else {
-					if (!item.endsWith(EXT)) {
-						item += EXT;
-					}
-					last = [item, ''];
-					res.push(last);
-				}
-			}
-			for (let r of res) {
-				if (r[1] === '') {
-					r[1] = pathToLibName(r[0]);
-				}
-			}
+			processUseDeclaration(its, res);
 		}
 	}
 	return res;
 }
 
-function parseSpecialComment(line: string) {
-	const COMMENT = '//', SP_CHAR = '@';
+function processNeedDeclaration(its: string[], res: [string, string|null][]) {
+	const EXT = '.js';
 
-	line = line.trim();
-	if (!line.startsWith(COMMENT)) {
-		return null;
+	for (let it of its) {
+		if (it.indexOf(EXT) === -1) {
+			it += EXT;
+		}
+		res.push([it, null]);
 	}
-	line = line.substring(COMMENT.length).trim();
-
-	if (SP_CHAR !== line[0]) {
-		return null;
-	}
-	const pos = line.search(/\s/);
-	if (-1 === pos) {
-		return null;
-	}
-	const type = line.substring(0, pos);
-	line = line.substring(pos).trim();
-	if (line.endsWith(';')) {
-		line = line.substring(0, line.length - 1).trim();
-	}
-	return [type, line];
 }
 
-function splitSpaceSeparatedLine(line: string) {
-	const ret: string[] = [];
-	let cur = '', inQt = '';
+function processUseDeclaration(its: string[], res: [string, string|null][]) {
+	const AS = 'as', EXT = '.js';
+	const re = new RegExp(`${EXT}$`, 'g');
 
-	for (let ch of line) {
-		if ('' === inQt) {
-			if ('"' === ch || "'" === ch) {
-				inQt = ch;
-			} else if (' ' === ch) {
-				if (cur.length) {
-					ret.push(cur);
-					cur = '';
-				}
-			} else {
-				cur = cur + ch;
-			}
-		} else if ('"' === inQt || "'" === inQt) {
-			if (ch === inQt) {
-				inQt = '';
-			} else {
-				cur = cur + ch;
-			}
+	let last: [string, string]|null = null;
+
+	for (let i = 0; i < its.length; i += 1) {
+		let it = its[i];
+		if (it === AS && last !== null && i + 1 < its.length) {
+			last[1] = its[i + 1];
+			i += 1;
+		} else {
+			last = [it.replace(re, '') + EXT, ''];
+			res.push(last);
 		}
 	}
-	if ('' === inQt && cur.length) {
-		ret.push(cur);
+	pathToLibNameAll(res);
+}
+
+function parseSpecialComment(line: string): [string, string[]]|null {
+	const COMMENT = '//', SP_CHAR = '@';
+	const reg = new RegExp(`\\s*${COMMENT}\\s*(${SP_CHAR}\\w+)\\s*(.*)`);
+
+	const m = line.trim().match(reg);
+	if (m) {
+		let ps = m[2];
+		if (ps.endsWith(';')) {
+			ps = ps.slice(0, -1).trim();
+		}
+		return [m[1], splitSpaceSeparatedLine(ps)];
+	}
+	return null;
+}
+
+function splitSpaceSeparatedLine(str: string) {
+	const reg = /"([^"]*)"|'([^']*)'|[^ ]+/g;
+	const ret: string[] = [];
+
+	for (const m of str.matchAll(reg)) {
+		const p = m[1] ?? m[2] ?? m[0];
+		if (p.length) {
+			ret.push(p);
+		}
 	}
 	return ret;
 }
 
-function unwrapQuote(str: string) {
-	if (
-		("'" === str[0] && "'" === str.at(-1)) ||
-		('"' === str[0] && '"' === str.at(-1))
-	) {
-		return str.substring(1, str.length - 1);
+function pathToLibNameAll(res: [string, string|null][]) {
+	for (let r of res) {
+		if ('' === r[1]) {
+			r[1] = pathToLibName(r[0]);
+		}
 	}
-	return str;
 }
 
 function pathToLibName(path: string) {
-	let val  = path.replace('/', '\\');
-	const ps = val.split('\\').reverse();
+	let val  = path.replace('/', '\\').replace(/\\\\+/g, '\\');
+	const ps = val.split('\\').filter(e => e.trim().length).reverse();
 
-	for (const p of ps) {
-		const q = p.trim();
-		if (!q.length) {
-			continue;
-		}
-		const pos = q.indexOf('.');
-		val = q.substring(0, pos).toUpperCase();
-		break;
+	if (ps.length) {
+		const pos = ps[0].indexOf('.');
+		val = ps[0].substring(0, pos);
 	}
-	return val.replace(/[ -+\\.]/, '_');
+	return val.toUpperCase().replace(/[ -+\\.]/, '_');
 }

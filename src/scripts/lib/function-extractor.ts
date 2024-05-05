@@ -2,7 +2,7 @@
  * Function Extractor
  *
  * @author Takuto Yanagida
- * @version 2024-05-02
+ * @version 2024-05-05
  */
 
 import * as acorn from 'acorn';
@@ -17,7 +17,7 @@ export default function extractFunction(code: string) {
 	];
 
 	const fns: string[] = [];
-	let success = true;
+	let res = true;
 
 	try {
 		acorn_walk.simple(
@@ -49,7 +49,7 @@ export default function extractFunction(code: string) {
 			}, acorn_walk.base);
 	} catch (e: unknown) {
 		console.error(e);
-		success = false;
+		res = false;
 	}
-	return { fns, success };
+	return { fns, res };
 }

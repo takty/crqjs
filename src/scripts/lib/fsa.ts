@@ -2,20 +2,20 @@
  * File System Access
  *
  * @author Takuto Yanagida
- * @version 2024-05-01
+ * @version 2024-05-02
  */
 
 export default class Fsa {
 
-	sep = '/';
+	static sep = '/';
 
-	dirName(path: string) {
+	static dirName(path: string) {
 		const es = path.split('/').map(e => e.trim()).filter(e => e.length);
 		es.pop();
 		return es.join('/');
 	}
 
-	baseName(path: string, ext: string|null = null) {
+	static baseName(path: string, ext: string|null = null) {
 		const ps = path.split('/').map(e => e.trim()).filter(e => e.length);
 		const le = ps.pop() ?? '';
 		if (ext && le.endsWith(ext)) {
@@ -24,20 +24,20 @@ export default class Fsa {
 		return le;
 	}
 
-	extName(path: string) {
-		const base = this.baseName(path);
+	static extName(path: string) {
+		const base = Fsa.baseName(path);
 		const res = base.match(/^(.+?)(\.[^.]+)?$/) ?? [];
 		const [,, ext] = res.map(m => m ?? '');
 		return ext;
 	}
 
-	#dirBaseName(path: string) {
+	static #dirBaseName(path: string) {
 		const ps = path.split('/').map(e => e.trim()).filter(e => e.length);
 		const le = ps.pop() ?? '';
 		return [ps.join('/'), le];
 	}
 
-	join(...ps: string[]) {
+	static join(...ps: string[]) {
 		const re = new RegExp('^/+|/+$', 'g');
 		return ps.map(e => e.replace(re, '')).filter(e => e.length).join('/');
 	}
@@ -51,7 +51,6 @@ export default class Fsa {
 	constructor(hRoot: FileSystemDirectoryHandle) {
 		this.#hRoot = hRoot;
 	}
-
 
 	async filePathToUrl(path: string) {
 		console.log('filePathToUrl: ' + path);
@@ -76,10 +75,10 @@ export default class Fsa {
 			return '';
 		}
 		const f = await hf.getFile();
-		return await this.fileToUrl(f);
+		return await this.fileToDataUrl(f);
 	}
 
-	async fileToUrl(file: Blob) {
+	async fileToDataUrl(file: Blob) {
 		const read = (f: Blob): Promise<string> => {
 			return new Promise((res, rej) => {
 				const fr = new FileReader();
@@ -148,7 +147,7 @@ export default class Fsa {
 
 		const h = await this.getFileHandle(path, { create: true });
 		if (null === h) {
-			return null;
+			return false;
 		}
 		let res = true;
 		const w = await h.createWritable();
@@ -158,7 +157,7 @@ export default class Fsa {
 	}
 
 	async exists(path: string) {
-		const [dir, base] = this.#dirBaseName(path);
+		const [dir, base] = Fsa.#dirBaseName(path);
 		const hDir = await this.getDirectoryHandle(dir);
 		return hDir && null !== await this.#getEntry(hDir, base);
 	}
@@ -167,10 +166,12 @@ export default class Fsa {
 		return await this.getDirectoryHandle(path, { create: true });
 	}
 
-	async rmdir(path: string) {
-		const [dir, base] = this.#dirBaseName(path);
+	async rmdir(path: string): Promise<boolean|TypeError|DOMException> {
+		const [dir, base] = Fsa.#dirBaseName(path);
 		const hDir = await this.getDirectoryHandle(dir);
-		if (!hDir) return false;
+		if (null === hDir) {
+			return false;
+		}
 		let res = true;
 		await hDir.removeEntry(base, { recursive: true }).catch(e => { res = e; });
 		return res;
