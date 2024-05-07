@@ -1,4 +1,5 @@
 <script lang="ts">
+	import "./app.css";
 	import Fsa from './scripts/lib/fsa.js';
 	import Exporter from './scripts/exporter.js';
 	import extractFunction from './scripts/lib/function-extractor.js';
@@ -11,7 +12,7 @@
 
 	let fsa: Fsa|null = null;
 	let fileName: string|null = null;
-	let curPath: string|null = null;
+	let curPath: string[]|null = null;
 	let source: string;
 
 	let _onClose: (hDir: FileSystemDirectoryHandle | null, hFile: FileSystemFileHandle | null, fn: string|null) => void;
@@ -44,7 +45,7 @@
 
 	async function save() {
 		if (fsa !== null && fileName !== null) {
-			fsa.writeFile(fileName, source);
+			fsa.writeFile([fileName], source);
 		}
 	}
 
@@ -52,7 +53,7 @@
 		openDialog(async (hDir: FileSystemDirectoryHandle | null, hFile: FileSystemFileHandle | null, fn: string|null) => {
 			if (hDir && fn) {
 				fsa = new Fsa(hDir);
-				fsa.writeFile(fn, source);
+				fsa.writeFile([fn], source);
 			}
 		});
 	}
@@ -62,9 +63,9 @@
 		console.log(fileName);
 		if (fsa !== null && fileName !== null) {
 			const ex  = new Exporter(fsa);
-			const ext = Fsa.extName(fileName);
+			const ext = Fsa.extName([fileName]);
 			const fn  = fileName.substring(0, fileName.length - ext.length);
-			const [r, path] = await ex.exportAsWebPage(source, fileName, `/${fn}.export`, true, 'url');
+			const [r, path] = await ex.exportAsWebPage(source, [fileName], [`${fn}.export`], true, 'url');
 			if (r && path) {
 				curPath = path;
 			}
@@ -80,7 +81,7 @@
 
 			const ex  = new Exporter(fsa);
 			const fn  = 'temp';
-			const [r, path] = await ex.exportAsWebPage(source, '', `/${fn}.export`, true, 'url');
+			const [r, path] = await ex.exportAsWebPage(source, [], [`/${fn}.export`], true, 'url');
 			if (r && path) {
 				const fh = await fsa.getFileHandle(path);
 				if (null !== fh) {
@@ -93,20 +94,22 @@
 	async function saveAsLibrary() {
 		if (fsa !== null && fileName !== null) {
 			const ex  = new Exporter(fsa);
-			const ext = Fsa.extName(fileName);
+			const ext = Fsa.extName([fileName]);
 			const fn  = fileName.substring(0, fileName.length - ext.length);
-			const [r, path] = await ex.exportAsLibrary(source, `${fn}.lib.js`, fn, extractFunction(source));
+			const [r, path] = await ex.exportAsLibrary(source, [`${fn}.lib.js`], fn, extractFunction(source));
 		}
 	}
+
+	import { Button } from "$lib/components/ui/button";
 </script>
 
 <main>
 	<div class="action">
-		<button on:click={open}>Open...</button>
-		<button on:click={save}>Save</button>
-		<button on:click={saveAs}>Save As...</button>
-		<button on:click={runCode}>Run</button>
-		<button on:click={saveAsLibrary}>Save as library</button>
+		<Button on:click={open}>Open...</Button>
+		<Button on:click={save}>Save</Button>
+		<Button on:click={saveAs}>Save As...</Button>
+		<Button on:click={runCode}>Run</Button>
+		<Button on:click={saveAsLibrary}>Save as library</Button>
 	</div>
 
 	<Editor bind:value={source}/>
@@ -119,6 +122,7 @@
 		on:close={closeDialog}
 	/>
 </main>
+
 
 <style>
 	main {
