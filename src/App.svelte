@@ -4,6 +4,7 @@
 	import Exporter from './scripts/exporter.js';
 	import extractFunction from './scripts/lib/function-extractor.js';
 
+	import Header from "./components/Header.svelte";
 	import Editor from "./components/Editor.svelte";
 	import DirectoryFilePicker from "./components/DirectoryFilePicker.svelte";
 
@@ -100,17 +101,18 @@
 		}
 	}
 
-	import { Button } from "$lib/components/ui/button";
+	function commandHandler(id: string) {
+		switch (id) {
+			case 'open': open(); break;
+			case 'save': save(); break;
+			case 'save-as': saveAs(); break;
+			case 'run': runCode(); break;
+		}
+	}
 </script>
 
-<main>
-	<div class="action">
-		<Button on:click={open}>Open...</Button>
-		<Button on:click={save}>Save</Button>
-		<Button on:click={saveAs}>Save As...</Button>
-		<Button on:click={runCode}>Run</Button>
-		<Button on:click={saveAsLibrary}>Save as library</Button>
-	</div>
+<main class="flex flex-col h-full">
+	<Header handler={commandHandler}/>
 
 	<Editor bind:value={source}/>
 
@@ -123,19 +125,7 @@
 	/>
 </main>
 
-
 <style>
-	main {
-		display: flex;
-		flex-direction: column;
-		margin: 0;
-		width: 100%;
-	}
-	.action {
-		display: flex;
-		gap: 1rem;
-	}
-
 	.status-bar {
 		height: 1.5rem;
 		background-color: #eee;
