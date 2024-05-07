@@ -11,12 +11,12 @@ import extractDeclarations from './custom-declaration.js';
 
 const EXP_EOL = '\r\n';
 
-export async function exportAsLibrary(code: string, fsa: Fsa, filePath: string, nameSpace: string, codeStructure: { fns: string[] }, doIncludeUseLib: boolean = false) {
+export async function exportAsLibrary(code: string, fsa: Fsa, filePs: string[], nameSpace: string, codeStructure: { fns: string[] }, doIncludeUseLib: boolean = false) {
 	const fns = [...codeStructure.fns];
 	let inc = '';
 
 	if (doIncludeUseLib) {
-		const bp = Fsa.dirName(filePath);
+		const bp = Fsa.dirName(filePs);
 		const ul = await concatUseLib(code, fsa, bp, fns);
 		if (Array.isArray(ul)) {
 			return ul;
@@ -24,12 +24,12 @@ export async function exportAsLibrary(code: string, fsa: Fsa, filePath: string, 
 		inc = ul;
 	}
 	const lc  = createLibraryCode(code, fns, nameSpace, 0, inc);
-	const res = await fsa.writeFile(filePath, lc);
-	return [res, filePath];
+	const res = await fsa.writeFile(filePs, lc);
+	return [res, filePs];
 }
 
-export async function readAsLibrary(fsa: Fsa, filePath: string, nameSpace: string, indent: number = 0) {
-	const c = await fsa.readFile(filePath);
+export async function readAsLibrary(fsa: Fsa, filePs: string[], nameSpace: string, indent: number = 0) {
+	const c = await fsa.readFile(filePs) as string;
 	if (null === c) {
 		return null;
 	}
@@ -37,12 +37,12 @@ export async function readAsLibrary(fsa: Fsa, filePath: string, nameSpace: strin
 	return createLibraryCode(c, fns, nameSpace, indent);
 }
 
-async function concatUseLib(code: string, fsa: Fsa, baseDir: string, fns: string[]) {
+async function concatUseLib(code: string, fsa: Fsa, baseDirPs: string[], fns: string[]) {
 	const decs = extractDeclarations(code).filter(e => null !== e[1]) as [string ,string][];
 	const lcs  = [];
 
 	for (let [lib, ns] of decs) {
-		const lc = await readAsLibrary(fsa, Fsa.join(baseDir, lib), ns, 1);
+		const lc = await readAsLibrary(fsa, [...baseDirPs, ...Fsa.pathToPs(lib)], ns, 1);
 		if (!lc) {
 			return [false, lib];
 		}

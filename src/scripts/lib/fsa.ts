@@ -2,44 +2,40 @@
  * File System Access
  *
  * @author Takuto Yanagida
- * @version 2024-05-02
+ * @version 2024-05-06
  */
 
 export default class Fsa {
 
-	static sep = '/';
-
-	static dirName(path: string) {
-		const es = path.split('/').map(e => e.trim()).filter(e => e.length);
-		es.pop();
-		return es.join('/');
+	static pathToPs(path: string) {
+		return path.split('/').map(e => e.trim()).filter(e => e.length);
 	}
 
-	static baseName(path: string, ext: string|null = null) {
-		const ps = path.split('/').map(e => e.trim()).filter(e => e.length);
-		const le = ps.pop() ?? '';
-		if (ext && le.endsWith(ext)) {
-			return le.substring(0, le.length - ext.length);
+	static psToPath(ps: string[], separator: string = '/') {
+		return ps.join(separator);
+	}
+
+
+	// -------------------------------------------------------------------------
+
+
+	static dirName(ps: string[]) {
+		return ps.slice(0, -1);
+	}
+
+	static baseName(ps: string[], ext: string|null = null) {
+		const last = ps.at(-1) ?? '';
+		if (ext && last.endsWith(ext)) {
+			return last.slice(0, -ext.length);
 		}
-		return le;
+		return last;
 	}
 
-	static extName(path: string) {
-		const base = Fsa.baseName(path);
-		const res = base.match(/^(.+?)(\.[^.]+)?$/) ?? [];
+	static extName(ps: string[]) {
+		const last = ps.at(-1) ?? '';
+		const res = last.match(/^(.+?)(\.[^.]+)?$/) ?? [];
 		const [,, ext] = res.map(m => m ?? '');
 		return ext;
-	}
-
-	static #dirBaseName(path: string) {
-		const ps = path.split('/').map(e => e.trim()).filter(e => e.length);
-		const le = ps.pop() ?? '';
-		return [ps.join('/'), le];
-	}
-
-	static join(...ps: string[]) {
-		const re = new RegExp('^/+|/+$', 'g');
-		return ps.map(e => e.replace(re, '')).filter(e => e.length).join('/');
 	}
 
 
@@ -47,158 +43,164 @@ export default class Fsa {
 
 
 	#hRoot: FileSystemDirectoryHandle;
+	#lastError: null|TypeError|DOMException = null;
 
 	constructor(hRoot: FileSystemDirectoryHandle) {
 		this.#hRoot = hRoot;
 	}
 
-	async filePathToUrl(path: string) {
-		console.log('filePathToUrl: ' + path);
-
-		const hf = await this.getFileHandle(path);
-		if (null === hf) {
-			return '';
-		}
-		const f = await hf.getFile();
-		return URL.createObjectURL(f);
+	getLastError() {
+		return this.#lastError;
 	}
 
+	async getFileHandle(ps: string[], options = {}): Promise<FileSystemFileHandle|null> {
+		console.log('getFileHandle: ' + ps.join('/'));
 
-	// -------------------------------------------------------------------------
-
-
-	async filePathToDataUrl(path: string) {
-		console.log('filePathToDataUrl: ' + path);
-
-		const hf   = await this.getFileHandle(path);
-		if (null === hf) {
-			return '';
-		}
-		const f = await hf.getFile();
-		return await this.fileToDataUrl(f);
-	}
-
-	async fileToDataUrl(file: Blob) {
-		const read = (f: Blob): Promise<string> => {
-			return new Promise((res, rej) => {
-				const fr = new FileReader();
-				fr.addEventListener('load', () => res(fr.result as string));
-				fr.addEventListener('error', () => rej(fr.error));
-				fr.readAsDataURL(f);
-			});
-		};
-		return await read(file).catch(() => null);
-	}
-
-	async #getEntry(hDir: FileSystemDirectoryHandle, name: string): Promise<FileSystemHandle|null> {
-		for await (const e of hDir.values()) {
-			if (e.name === name) {
-				return e;
+		if (ps.length) {
+			const last = ps.at(-1) ?? '';
+			const hDir = await this.getDirectoryHandle(ps.slice(0, -1), options);
+			if (null !== hDir) {
+				return await hDir.getFileHandle(last, options).catch(e => { this.#lastError = e; return null; });
 			}
 		}
 		return null;
 	}
 
-	async getFileHandle(path: string, options = {}): Promise<FileSystemFileHandle|null> {
-		console.log('getFileHandle: ' + path);
+	async getDirectoryHandle(ps: string[], options = {}): Promise<FileSystemDirectoryHandle|null> {
+		console.log('getDirectoryHandle: ' + ps.join('/'));
 
-		const ps = path.split('/').map(e => e.trim()).filter(e => e.length);
-		const le = ps.pop() ?? '';
-
-		const e = await this.getDirectoryHandle(ps.join('/'), options);
-		if (null === e) {
-			return null;
-		}
-		return await e.getFileHandle(le, options).catch(() => null);
-	}
-
-	async getDirectoryHandle(path: string, options = {}): Promise<FileSystemDirectoryHandle|null> {
-		console.log('getDirectoryHandle: ' + path);
-
-		const ps = path.split('/').map(e => e.trim()).filter(e => e.length);
-
-		let e: FileSystemDirectoryHandle|null = this.#hRoot;
+		let hDir: FileSystemDirectoryHandle|null = this.#hRoot;
 		for (const p of ps) {
-			e = await e.getDirectoryHandle(p, options).catch(() => null);
-			if (null === e) {
+			hDir = await hDir.getDirectoryHandle(p, options).catch(e => { this.#lastError = e; return null; });
+			if (null === hDir) {
 				return null;
 			}
 		}
-		return e;
+		return hDir;
 	}
 
 
 	// -------------------------------------------------------------------------
 
 
-	async readFile(path: string) {
-		console.log('readFile: ' + path);
+	async filePsToObjectUrl(ps: string[]) {
+		console.log('filePsToObjectUrl: ' + ps.join('/'));
 
-		const h = await this.getFileHandle(path);
-		if (null === h) {
-			return null;
+		const hFile = await this.getFileHandle(ps);
+		if (null !== hFile) {
+			const f = await hFile.getFile();
+			return URL.createObjectURL(f);
 		}
-		const file: File = await h.getFile();
-		return await file.text();
+		return '';
 	}
 
-	async writeFile(path: string, text: string) {
-		console.log('writeFile: ' + path);
+	async filePsToDataUrl(ps: string[]) {
+		console.log('filePsToDataUrl: ' + ps.join('/'));
 
-		const h = await this.getFileHandle(path, { create: true });
-		if (null === h) {
-			return false;
+		const hFile   = await this.getFileHandle(ps);
+		if (null !== hFile) {
+			const f = await hFile.getFile();
+			return await this.fileToDataUrl(f);
 		}
-		let res = true;
-		const w = await h.createWritable();
-		await w.write(text).catch(e => { res = e; });
-		await w.close();
+		return '';
+	}
+
+	async fileToDataUrl(file: Blob) {
+		return await Fsa.#createRead(file).catch(e => { this.#lastError = e; return null; });
+	}
+
+	static #createRead(f: Blob): Promise<string> {
+		return new Promise((res, rej) => {
+			const fr = new FileReader();
+			fr.addEventListener('load', () => res(fr.result as string));
+			fr.addEventListener('error', () => rej(fr.error));
+			fr.readAsDataURL(f);
+		});
+	}
+
+
+	// -------------------------------------------------------------------------
+
+
+	async readFile(ps: string[], as: 'text'|'stream'|'buffer' = 'text') {
+		console.log('readFile: ' + ps.join('/'));
+
+		const hFile = await this.getFileHandle(ps);
+		if (null !== hFile) {
+			const file: File = await hFile.getFile();
+			return await Fsa.#readFileAs(file, as);
+		}
+		return null;
+	}
+
+	static async #readFileAs(file: File, as: 'text'|'stream'|'buffer') {
+		let ret = null;
+		if ('text' === as) {
+			ret = await file.text();
+		} else if ('stream' === as) {
+			ret = file.stream();
+		} else if ('buffer' === as) {
+			ret = await file.arrayBuffer();
+		}
+		return ret;
+	}
+
+	async writeFile(ps: string[], data: any): Promise<boolean> {
+		console.log('writeFile: ' + ps.join('/'));
+
+		let res = false;
+		const hFile = await this.getFileHandle(ps, { create: true });
+		if (null !== hFile) {
+			res = true;
+			const w = await hFile.createWritable();
+			await w.write(data).catch(e => { this.#lastError = e; res = false; });
+			await w.close();
+		}
 		return res;
 	}
 
-	async exists(path: string) {
-		const [dir, base] = Fsa.#dirBaseName(path);
-		const hDir = await this.getDirectoryHandle(dir);
-		return hDir && null !== await this.#getEntry(hDir, base);
-	}
+	async copyFile(from: string[], to: string[], as: 'text'|'stream'|'buffer' = 'text') {
+		console.log('copyFile: ' + from.join('/') + ' -> ' + to.join('/'));
 
-	async mkdir(path: string) {
-		return await this.getDirectoryHandle(path, { create: true });
-	}
-
-	async rmdir(path: string): Promise<boolean|TypeError|DOMException> {
-		const [dir, base] = Fsa.#dirBaseName(path);
-		const hDir = await this.getDirectoryHandle(dir);
-		if (null === hDir) {
-			return false;
+		const data = await this.readFile(from, as);
+		if (null !== data) {
+			return this.writeFile(to, data);
 		}
-		let res = true;
-		await hDir.removeEntry(base, { recursive: true }).catch(e => { res = e; });
+		return false;
+	}
+
+
+	// -------------------------------------------------------------------------
+
+
+	async exists(ps: string[]) {
+		const last = ps.at(-1) ?? '';
+		const hDir = await this.getDirectoryHandle(ps.slice(0, -1));
+
+		if (null !== hDir) {
+			for await (const e of hDir.values()) {
+				if (e.name === last) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	async mkdir(ps: string[]) {
+		return await this.getDirectoryHandle(ps, { create: true });
+	}
+
+	async rmdir(ps: string[]): Promise<boolean> {
+		const last = ps.at(-1) ?? '';
+		let res = false;
+
+		const hDir = await this.getDirectoryHandle(ps.slice(0, -1));
+		if (null !== hDir) {
+			res = true;
+			await hDir.removeEntry(last, { recursive: true }).catch(e => { this.#lastError = e; res = false; });
+		}
 		return res;
 	}
 
-
-	// -----------------------------------------------------------------------------
-
-
-	async copyFile(from: string, to: string) {
-		console.log('copyFile: ' + from + ' ' + to);
-
-		const hFileFrom = await this.getFileHandle(from);
-		if (null === hFileFrom) {
-			return false;
-		}
-		const file = await hFileFrom.getFile();
-		const text = await file.text();
-
-		let res = true;
-		const hFileTo = await this.getFileHandle(to, { create: true });
-		if (null === hFileTo) {
-			return false;
-		}
-		const writable = await hFileTo.createWritable();
-		await writable.write(text).catch(e => { res = e; });
-		await writable.close();
-		return res;
-	}
 }
