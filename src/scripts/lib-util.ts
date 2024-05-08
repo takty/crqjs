@@ -5,7 +5,7 @@
  * @version 2024-05-06
  */
 
-import Fsa from './lib/fsa.js';
+import Fsa from './fsa.js';
 import extractDeclarations from './custom-declaration.js';
 
 const DEF_DIR_PS = ['def'];

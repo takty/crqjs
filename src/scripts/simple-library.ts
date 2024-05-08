@@ -5,8 +5,8 @@
  * @version 2024-05-05
  */
 
-import Fsa from './lib/fsa.js';
-import extractFunction from './lib/function-extractor.js';
+import Fsa from './fsa.js';
+import extractFunction from './function-extractor.js';
 import extractDeclarations from './custom-declaration.js';
 
 const EXP_EOL = '\r\n';
