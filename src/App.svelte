@@ -1,6 +1,6 @@
 <script lang="ts">
 	import "./app.css";
-	import { FileSystem, Path } from './scripts/fsa.js';
+	import { FileSystem, Path } from './lib/fsa.js';
 	import Exporter from './scripts/exporter.js';
 	import extractFunction from './scripts/function-extractor.js';
 
