@@ -1,8 +1,8 @@
 <script lang="ts">
 	import "./app.css";
-	import Fsa from './scripts/lib/fsa.js';
+	import { FileSystem, Path } from './scripts/fsa.js';
 	import Exporter from './scripts/exporter.js';
-	import extractFunction from './scripts/lib/function-extractor.js';
+	import extractFunction from './scripts/function-extractor.js';
 
 	import Header from "./components/Header.svelte";
 	import Editor from "./components/Editor.svelte";
@@ -11,9 +11,9 @@
 	// let dfp: DirectoryFilePicker;
 	let fileChooser: HTMLDialogElement;
 
-	let fsa: Fsa|null = null;
-	let fileName: string|null = null;
-	let curPath: string[]|null = null;
+	let fs: FileSystem|null = null;
+	let filePath: Path|null = null;
+	let curPath: Path|null = null;
 	let source: string;
 
 	let _onClose: (hDir: FileSystemDirectoryHandle | null, hFile: FileSystemFileHandle | null, fn: string|null) => void;
@@ -38,51 +38,51 @@
 				const f = await hFile.getFile();
 				source = await f.text();
 
-				fsa = new Fsa(hDir);
-				fileName = hFile.name;
+				fs = new FileSystem(hDir);
+				const es = await hDir.resolve(hFile);
+				filePath = new Path(es);
 			}
 		});
 	}
 
 	async function save() {
-		if (fsa !== null && fileName !== null) {
-			fsa.writeFile([fileName], source);
+		if (fs !== null && filePath !== null) {
+			fs.writeFile(filePath, source);
 		}
 	}
 
 	async function saveAs() {
 		openDialog(async (hDir: FileSystemDirectoryHandle | null, hFile: FileSystemFileHandle | null, fn: string|null) => {
 			if (hDir && fn) {
-				fsa = new Fsa(hDir);
-				fsa.writeFile([fn], source);
+				fs = new FileSystem(hDir);
+				fs.writeFile(new Path(fn), source);
 			}
 		});
 	}
 
 	async function runCode() {
-		console.log(fsa);
-		console.log(fileName);
-		if (fsa !== null && fileName !== null) {
-			const ex  = new Exporter(fsa);
-			const ext = Fsa.extName([fileName]);
-			const fn  = fileName.substring(0, fileName.length - ext.length);
-			const [r, path] = await ex.exportAsWebPage(source, [fileName], [`${fn}.export`], true, 'url');
+		console.log(fs);
+		console.log(filePath);
+		if (fs !== null && filePath !== null) {
+			const ex  = new Exporter(fs);
+			const fn  = filePath.baseName(filePath.extName());
+			const [r, path] = await ex.exportAsWebPage(source, filePath, new Path(`${fn}.export`), true, 'url');
 			if (r && path) {
 				curPath = path;
 			}
 			if (curPath) {
-				const fh = await fsa.getFileHandle(curPath);
+				const fh = await fs.getFileHandle(curPath);
 				if (null !== fh) {
 					window.open(URL.createObjectURL(await fh.getFile()), 'field');
 				}
 			}
 		} else {
 			const hDir = await navigator.storage.getDirectory();
-			const fsa = new Fsa(hDir);
+			const fsa = new FileSystem(hDir);
 
 			const ex  = new Exporter(fsa);
 			const fn  = 'temp';
-			const [r, path] = await ex.exportAsWebPage(source, [], [`/${fn}.export`], true, 'url');
+			const [r, path] = await ex.exportAsWebPage(source, new Path(), new Path(`/${fn}.export`), true, 'url');
 			if (r && path) {
 				const fh = await fsa.getFileHandle(path);
 				if (null !== fh) {
@@ -93,11 +93,10 @@
 	}
 
 	async function saveAsLibrary() {
-		if (fsa !== null && fileName !== null) {
-			const ex  = new Exporter(fsa);
-			const ext = Fsa.extName([fileName]);
-			const fn  = fileName.substring(0, fileName.length - ext.length);
-			const [r, path] = await ex.exportAsLibrary(source, [`${fn}.lib.js`], fn, extractFunction(source));
+		if (fs !== null && filePath !== null) {
+			const ex  = new Exporter(fs);
+			const fn  = filePath.baseName(filePath.extName());
+			const [r, path] = await ex.exportAsLibrary(source, filePath.parent(), filePath.parent().concat(`${fn}.lib.js`), fn, extractFunction(source));
 		}
 	}
 
@@ -107,6 +106,7 @@
 			case 'save': save(); break;
 			case 'save-as': saveAs(); break;
 			case 'run': runCode(); break;
+			case 'save-as-library': saveAsLibrary(); break;
 		}
 	}
 </script>

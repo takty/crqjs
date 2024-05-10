@@ -2,25 +2,24 @@
  * Library Utilities
  *
  * @author Takuto Yanagida
- * @version 2024-05-06
+ * @version 2024-05-09
  */
 
-import Fsa from './fsa.js';
+import { FileSystem, Path } from './fsa.js';
 import extractDeclarations from './custom-declaration.js';
 
-const DEF_DIR_PS = ['def'];
+const DEF_DIR_PS = 'def';
 
-export async function checkLibraryReadable(fsa: Fsa, code: string, filePs: string[]) {
+export async function checkLibraryReadable(code: string, fs: FileSystem, baseDir: Path) {
 	const decs = extractDeclarations(code);
-	const bp   = filePs.length ? Fsa.dirName(filePs) : null;
 
-	for (let [lib, ns] of decs) {
+	for (let [lib,] of decs) {
 		if (!lib.startsWith('http')) {
-			if (!bp) {
+			if (!baseDir) {
 				return lib;  // Error
 			}
-			const cont = await fsa.readFile([...bp, ...Fsa.pathToPs(lib)]);
-			if (cont === null) {
+			const c = await fs.readFile(baseDir.concat(lib));
+			if (null === c) {
 				return lib;  // Error
 			}
 		}
@@ -28,24 +27,22 @@ export async function checkLibraryReadable(fsa: Fsa, code: string, filePs: strin
 	return true;
 }
 
-export async function  loadDefFile(fsa: Fsa, code: string, filePs: string[] = [], defExt: string = '.json') {
+export async function  loadDefFile(code: string, fs: FileSystem, baseDir: Path|null = null, defExt: string = '.json') {
 	const decs = extractDeclarations(code);
-	const bp   = filePs.length ? Fsa.dirName(filePs) : null;
 	const ret: string[]  = [];
 
-	for (let [lib, ns] of decs) {
+	for (let [lib,] of decs) {
 		if (!lib.startsWith('http')) {
-			if (!bp) {
+			if (!baseDir) {
 				continue;
 			}
-			const ps = [...bp, ...Fsa.pathToPs(lib)];
-			const cont = await fsa.readFile(ps) as string;
-			if (cont === null) {
+			const libPath = baseDir.concat(lib);
+			const c = await fs.readFile(libPath);
+			if (null === c) {
 				continue;  // Error
 			}
-			const dp  = makeDefPath(ps, defExt);
-			const def = await fsa.readFile(dp) as string;
-			if (def === null) {
+			const def = await fs.readFile(makeDefPath(libPath, defExt)) as string;
+			if (null === def) {
 				continue;
 			}
 			ret.push(def);
@@ -54,9 +51,7 @@ export async function  loadDefFile(fsa: Fsa, code: string, filePs: string[] = []
 	return ret;
 }
 
-function makeDefPath(ps: string[], defExt: string) {
-	const dir = Fsa.dirName(ps);
-	const ext = Fsa.extName(ps);
-	const bn  = Fsa.baseName(ps, ext);
-	return [...dir, ...DEF_DIR_PS, `${bn}${defExt}`];
+function makeDefPath(path: Path, defExt: string) {
+	const bn  = path.baseName(path.extName());
+	return path.parent().concat(DEF_DIR_PS).concat(`${bn}${defExt}`);
 }

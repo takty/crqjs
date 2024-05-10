@@ -2,10 +2,10 @@
  * Exporter
  *
  * @author Takuto Yanagida
- * @version 2024-05-05
+ * @version 2024-05-09
  */
 
-import Fsa from './fsa.js';
+import { FileSystem, Path } from './fsa.js';
 import extractDeclarations from './custom-declaration.js';
 import { exportAsLibrary, readAsLibrary } from './simple-library.js';
 
@@ -20,10 +20,10 @@ const EXP_EOL    = '\r\n';
 
 export default class Exporter {
 
-	#fsa: Fsa;
+	#fsa: FileSystem;
 	#userCodeOffset = 0;
 
-	constructor(fsa: Fsa) {
+	constructor(fsa: FileSystem) {
 		this.#fsa = fsa;
 	}
 
@@ -31,35 +31,33 @@ export default class Exporter {
 		return this.#userCodeOffset;
 	}
 
-	async exportAsLibrary(code: string, filePs: string[], nameSpace: string, codeStructure: { fns: string[] }, doIncludeUseLib: boolean = false) {
-		return exportAsLibrary(code, this.#fsa, filePs, nameSpace, codeStructure, doIncludeUseLib);
+	async exportAsLibrary(code: string, baseDir: Path, destDir: Path, nameSpace: string, codeStructure: { fns: string[] }, doIncludeUseLib: boolean = false) {
+		return exportAsLibrary(code, this.#fsa, baseDir, destDir, nameSpace, codeStructure, doIncludeUseLib);
 	}
 
-	async exportAsWebPage(code: string, filePs: string[], dstDirPs: string[], injection = false, mode: ''|'url'|'pack'): Promise<[boolean, string[]]> {
+	async exportAsWebPage(code: string, srcPath: Path, destDir: Path, injection = false, mode: ''|'url'|'pack'): Promise<[boolean, Path]> {
 		const decs = extractDeclarations(code);
 		const libs = [];
 
-		const srcDirPs = Fsa.dirName(filePs);
+		const baseDir = srcPath.parent();
 
 		if (injection) {
-			const url = await this.#getLocalLibraryUrl(dstDirPs, INJECTION, mode);
-			if (!url) return [false, Fsa.pathToPs(INJECTION)];
+			const url = await this.#getLocalLibraryUrl(destDir, INJECTION, mode);
+			if (!url) return [false, new Path(INJECTION)];
 			libs.push(url);
 		}
-		if (filePs) {
+		if (srcPath) {
 			for (let [lib, ns] of decs) {
 				if (lib.startsWith('http')) {
 					libs.push(lib);
 				} else {
-					const libPs = Fsa.pathToPs(lib);
-
 					let url;
 					if (null === ns) {
-						url = await this.#getNeedLibraryUrl(lib, dstDirPs, [...srcDirPs, ...libPs], mode);
+						url = await this.#getNeedLibraryUrl(lib, destDir, baseDir.concat(lib), mode);
 					} else {
-						url = await this.#getUseLibraryUrl(lib, dstDirPs, [...srcDirPs, ...libPs], ns, mode);
+						url = await this.#getUseLibraryUrl(lib, destDir, baseDir.concat(lib), ns, mode);
 					}
-					if (!url) return [false, libPs];
+					if (!url) return [false, new Path(lib)];
 					libs.push(url);
 				}
 			}
@@ -68,15 +66,15 @@ export default class Exporter {
 				if (lib.startsWith('http')) {
 					libs.push(lib);
 				} else {
-					return [false, Fsa.pathToPs(lib)];
+					return [false, new Path(lib)];
 				}
 			}
 		}
-		const title = this.#getDocumentTitle(filePs);
-		return this.#writeExportedFile(code, title, dstDirPs, libs);
+		const title = this.#getDocumentTitle(srcPath);
+		return this.#writeExportedFile(code, title, destDir, libs);
 	}
 
-	async #getLocalLibraryUrl(destDirPs: string[], lib: string, mode: ''|'url'|'pack') {
+	async #getLocalLibraryUrl(destDir: Path, lib: string, mode: ''|'url'|'pack') {
 		if ('pack' === mode) {
 			const res  = await fetch(lib);
 			const blob = await res.blob();
@@ -84,55 +82,53 @@ export default class Exporter {
 		} else if ('url' === mode) {
 			const res  = await fetch(lib);
 			const lc = await res.text();
-			const to   = [...destDirPs, lib];
+			const to   = destDir.concat(lib);
 			if ( await this.#fsa.writeFile(to, lc) ) {
-				return await this.#fsa.filePsToObjectUrl(to);
+				return await this.#fsa.filePathToObjectUrl(to);
 			}
 			return null;
 		} else {
-			const temp = Fsa.dirName(Fsa.pathToPs(new URL(import.meta.url).pathname));
-			const from = [...temp, lib];
-			const to   = [...destDirPs, lib];
+			const temp = new Path(new URL(import.meta.url).pathname).parent();
+			const from = temp.concat(lib);
+			const to   = destDir.concat(lib);
 			await this.#fsa.copyFile(from, to);
-			return await this.#fsa.filePsToObjectUrl(to);
+			return await this.#fsa.filePathToObjectUrl(to);
 		}
 	}
 
-	async #getUseLibraryUrl(lib: string, dstDirPs: string[], srcPs: string[], ns: string, mode: ''|'url'|'pack') {
+	async #getUseLibraryUrl(lib: string, destDir: Path, srcFile: Path, ns: string, mode: ''|'url'|'pack') {
 		if ('pack' === mode) {
-			const lc = await readAsLibrary(this.#fsa, srcPs, ns);
+			const lc = await readAsLibrary(this.#fsa, srcFile, ns);
 			return lc ? await this.#fsa.fileToDataUrl(new Blob([lc], { type: 'text/javascript' })) : null;
 		}
-		const temp = [...Fsa.dirName(srcPs), Fsa.baseName(srcPs, Fsa.extName(srcPs)) + '.lib.js'];
-		const dstPs = [...dstDirPs, ...temp];
-		const c = await readAsLibrary(this.#fsa, srcPs, ns);
-		const res = c ? await this.#fsa.writeFile(dstPs, c) : false;
+		const destFile = destDir.concat(srcFile.parent().concat(srcFile.baseName(srcFile.extName()) + '.lib.js'));
+		const c = await readAsLibrary(this.#fsa, srcFile, ns);
+		const res = c ? await this.#fsa.writeFile(destFile, c) : false;
 		if (!res) {
 			return null;
 		}
 		if ('url' === mode) {
-			return await this.#fsa.filePsToObjectUrl(dstPs);
+			return await this.#fsa.filePathToObjectUrl(destFile);
 		}
 		return lib;
 	}
 
-	async #getNeedLibraryUrl(lib: string, dstDirPs: string[], srcPs: string[], mode: ''|'url'|'pack') {
+	async #getNeedLibraryUrl(lib: string, destDir: Path, srcFile: Path, mode: ''|'url'|'pack') {
 		if ('pack' === mode) {
-			return await this.#fsa.filePsToDataUrl(srcPs);
+			return await this.#fsa.filePathToDataUrl(srcFile);
 		}
-		// const dstFn = lib.split(/\/|\\/).map(e => ((e === '..') ? '_' : e)).join(Fsa.sep);
-		const dstPs = [...dstDirPs, ...srcPs];
-		const res = await this.#fsa.copyFile(srcPs, dstPs);
+		const destFile = destDir.concat(lib.split(/\/|\\/).map(e => ((e === '..') ? '_' : e)).join('/'));
+		const res = await this.#fsa.copyFile(srcFile, destFile);
 		if (!res) {
 			return null;
 		}
 		if ('url' === mode) {
-			return await this.#fsa.filePsToObjectUrl(dstPs);
+			return await this.#fsa.filePathToObjectUrl(destFile);
 		}
 		return lib;
 	}
 
-	async #writeExportedFile(code: string, title: string, dstDirPs: string[], libs: string[]): Promise<[boolean, string[]]> {
+	async #writeExportedFile(code: string, title: string, destDir: Path, libs: string[]): Promise<[boolean, Path]> {
 		const ls = code.split('\n').map(l => l.trimEnd()).join(EXP_EOL);
 
 		const head = HTML_HEAD1.replace('%TITLE%', title);
@@ -141,15 +137,15 @@ export default class Exporter {
 
 		this.#userCodeOffset = HTML_HEAD1.length + tags.length + HTML_HEAD2.length;
 
-		const dest = [...dstDirPs, 'index.html'];
+		const dest = destDir.concat('index.html');
 		const res  = await this.#fsa.writeFile(dest, cont);
 		return [res, dest];
 	}
 
-	#getDocumentTitle(filePs: string[]) {
+	#getDocumentTitle(srcFile: Path) {
 		let title = 'Croqujs';
-		if (filePs) {
-			title = Fsa.baseName(filePs, '.js');
+		if (srcFile) {
+			title = srcFile.baseName('.js');
 			title = title.charAt(0).toUpperCase() + title.slice(1);
 		}
 		return title;
@@ -159,27 +155,26 @@ export default class Exporter {
 	// -------------------------------------------------------------------------
 
 
-	async copyLibraryOfTemplate(code: string, tempFilePs: string[], dirPs: string[]) {
+	async copyLibraryOfTemplate(code: string, tempFile: Path, destDir: Path) {
 		const decs = extractDeclarations(code);
-		const bp   = Fsa.dirName(tempFilePs);
+		const baseDir   = tempFile.parent();
 
 		for (let [lib, ns] of decs) {
 			if (lib.startsWith('http')) {
 				continue;
 			}
-			const libPs = Fsa.pathToPs(lib);
 			if (ns) {
-				const c = await readAsLibrary(this.#fsa, [...bp, ...libPs], ns);
-				const dstFn = [...dirPs, ...Fsa.dirName(libPs), Fsa.baseName(libPs, Fsa.extName(libPs)) + '.lib.js'];
-				const res = c ? await this.#fsa.writeFile(dstFn, c) : false;
+				const libPath = new Path(lib);
+				const c = await readAsLibrary(this.#fsa, baseDir.concat(lib), ns);
+				const destFile = destDir.concat(libPath.parent()).concat(libPath.baseName(libPath.extName()) + '.lib.js');
+				const res = c ? await this.#fsa.writeFile(destFile, c) : false;
 				if (!res) {
 					return [false, lib];
 				}
 			} else {
-				const dstFn = lib.split(/\/|\\/).map(e => ((e === '..') ? '_' : e));
-				const dstPs = [...dirPs, ...dstFn];
-				if (! await this.#fsa.exists(dstPs)) {
-					const res = await this.#fsa.copyFile([...bp, ...libPs], dstPs);
+				const destFile = destDir.concat(lib.split(/\/|\\/).map(e => ((e === '..') ? '_' : e)).join('/'));
+				if (! await this.#fsa.exists(destFile)) {
+					const res = await this.#fsa.copyFile(baseDir.concat(lib), destFile);
 					if (!res) {
 						return [false, lib];
 					}

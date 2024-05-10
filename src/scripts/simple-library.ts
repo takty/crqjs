@@ -2,34 +2,33 @@
  * Simplified Library
  *
  * @author Takuto Yanagida
- * @version 2024-05-05
+ * @version 2024-05-09
  */
 
-import Fsa from './fsa.js';
+import { FileSystem, Path } from './fsa.js';
 import extractFunction from './function-extractor.js';
 import extractDeclarations from './custom-declaration.js';
 
 const EXP_EOL = '\r\n';
 
-export async function exportAsLibrary(code: string, fsa: Fsa, filePs: string[], nameSpace: string, codeStructure: { fns: string[] }, doIncludeUseLib: boolean = false) {
+export async function exportAsLibrary(code: string, fs: FileSystem, baseDir: Path, destFile: Path, nameSpace: string, codeStructure: { fns: string[] }, doIncludeUseLib: boolean = false) {
 	const fns = [...codeStructure.fns];
 	let inc = '';
 
 	if (doIncludeUseLib) {
-		const bp = Fsa.dirName(filePs);
-		const ul = await concatUseLib(code, fsa, bp, fns);
+		const ul = await concatUseLib(code, fs, baseDir, fns);
 		if (Array.isArray(ul)) {
 			return ul;
 		}
 		inc = ul;
 	}
 	const lc  = createLibraryCode(code, fns, nameSpace, 0, inc);
-	const res = await fsa.writeFile(filePs, lc);
-	return [res, filePs];
+	const res = await fs.writeFile(destFile, lc);
+	return [res, baseDir];
 }
 
-export async function readAsLibrary(fsa: Fsa, filePs: string[], nameSpace: string, indent: number = 0) {
-	const c = await fsa.readFile(filePs) as string;
+export async function readAsLibrary(fsa: FileSystem, srcFile: Path, nameSpace: string, indent: number = 0) {
+	const c = await fsa.readFile(srcFile) as string;
 	if (null === c) {
 		return null;
 	}
@@ -37,12 +36,12 @@ export async function readAsLibrary(fsa: Fsa, filePs: string[], nameSpace: strin
 	return createLibraryCode(c, fns, nameSpace, indent);
 }
 
-async function concatUseLib(code: string, fsa: Fsa, baseDirPs: string[], fns: string[]) {
+async function concatUseLib(code: string, fs: FileSystem, baseDir: Path, fns: string[]) {
 	const decs = extractDeclarations(code).filter(e => null !== e[1]) as [string ,string][];
 	const lcs  = [];
 
 	for (let [lib, ns] of decs) {
-		const lc = await readAsLibrary(fsa, [...baseDirPs, ...Fsa.pathToPs(lib)], ns, 1);
+		const lc = await readAsLibrary(fs, baseDir.concat(lib), ns, 1);
 		if (!lc) {
 			return [false, lib];
 		}

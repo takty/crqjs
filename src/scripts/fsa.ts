@@ -2,45 +2,22 @@
  * File System Access
  *
  * @author Takuto Yanagida
- * @version 2024-05-06
+ * @version 2024-05-09
  */
 
-export default class Fsa {
+export class FileSystem {
 
-	static pathToPs(path: string) {
-		return path.split('/').map(e => e.trim()).filter(e => e.length);
-	}
-
-	static psToPath(ps: string[], separator: string = '/') {
-		return ps.join(separator);
-	}
-
-
-	// -------------------------------------------------------------------------
-
-
-	static dirName(ps: string[]) {
-		return ps.slice(0, -1);
-	}
-
-	static baseName(ps: string[], ext: string|null = null) {
-		const last = ps.at(-1) ?? '';
-		if (ext && last.endsWith(ext)) {
-			return last.slice(0, -ext.length);
+	static async #readAs(file: File, as: 'text'|'stream'|'arrayBuffer') {
+		let ret = null;
+		if ('text' === as) {
+			ret = await file.text();
+		} else if ('stream' === as) {
+			ret = file.stream();
+		} else if ('arrayBuffer' === as) {
+			ret = await file.arrayBuffer();
 		}
-		return last;
+		return ret;
 	}
-
-	static extName(ps: string[]) {
-		const last = ps.at(-1) ?? '';
-		const res = last.match(/^(.+?)(\.[^.]+)?$/) ?? [];
-		const [,, ext] = res.map(m => m ?? '');
-		return ext;
-	}
-
-
-	// -------------------------------------------------------------------------
-
 
 	#hRoot: FileSystemDirectoryHandle;
 	#lastError: null|TypeError|DOMException = null;
@@ -53,25 +30,25 @@ export default class Fsa {
 		return this.#lastError;
 	}
 
-	async getFileHandle(ps: string[], options = {}): Promise<FileSystemFileHandle|null> {
-		console.log('getFileHandle: ' + ps.join('/'));
+	async getFileHandle(p: Path, options = {}): Promise<FileSystemFileHandle|null> {
+		console.log('getFileHandle: ' + p);
 
-		if (ps.length) {
-			const last = ps.at(-1) ?? '';
-			const hDir = await this.getDirectoryHandle(ps.slice(0, -1), options);
+		if (p.length) {
+			const bn = p.baseName();
+			const hDir = await this.getDirectoryHandle(p.parent(), options);
 			if (null !== hDir) {
-				return await hDir.getFileHandle(last, options).catch(e => { this.#lastError = e; return null; });
+				return await hDir.getFileHandle(bn, options).catch(e => { this.#lastError = e; return null; });
 			}
 		}
 		return null;
 	}
 
-	async getDirectoryHandle(ps: string[], options = {}): Promise<FileSystemDirectoryHandle|null> {
-		console.log('getDirectoryHandle: ' + ps.join('/'));
+	async getDirectoryHandle(p: Path, options = {}): Promise<FileSystemDirectoryHandle|null> {
+		console.log('getDirectoryHandle: ' + p);
 
 		let hDir: FileSystemDirectoryHandle|null = this.#hRoot;
-		for (const p of ps) {
-			hDir = await hDir.getDirectoryHandle(p, options).catch(e => { this.#lastError = e; return null; });
+		for (const e of p.elements) {
+			hDir = await hDir.getDirectoryHandle(e, options).catch(e => { this.#lastError = e; return null; });
 			if (null === hDir) {
 				return null;
 			}
@@ -83,10 +60,10 @@ export default class Fsa {
 	// -------------------------------------------------------------------------
 
 
-	async filePsToObjectUrl(ps: string[]) {
-		console.log('filePsToObjectUrl: ' + ps.join('/'));
+	async filePathToObjectUrl(p: Path) {
+		console.log('filePathToObjectUrl: ' + p);
 
-		const hFile = await this.getFileHandle(ps);
+		const hFile = await this.getFileHandle(p);
 		if (null !== hFile) {
 			const f = await hFile.getFile();
 			return URL.createObjectURL(f);
@@ -94,10 +71,10 @@ export default class Fsa {
 		return '';
 	}
 
-	async filePsToDataUrl(ps: string[]) {
-		console.log('filePsToDataUrl: ' + ps.join('/'));
+	async filePathToDataUrl(p: Path) {
+		console.log('filePathToDataUrl: ' + p);
 
-		const hFile   = await this.getFileHandle(ps);
+		const hFile   = await this.getFileHandle(p);
 		if (null !== hFile) {
 			const f = await hFile.getFile();
 			return await this.fileToDataUrl(f);
@@ -106,7 +83,7 @@ export default class Fsa {
 	}
 
 	async fileToDataUrl(file: Blob) {
-		return await Fsa.#createRead(file).catch(e => { this.#lastError = e; return null; });
+		return await FileSystem.#createRead(file).catch(e => { this.#lastError = e; return null; });
 	}
 
 	static #createRead(f: Blob): Promise<string> {
@@ -122,34 +99,22 @@ export default class Fsa {
 	// -------------------------------------------------------------------------
 
 
-	async readFile(ps: string[], as: 'text'|'stream'|'buffer' = 'text') {
-		console.log('readFile: ' + ps.join('/'));
+	async readFile(p: Path, as: 'text'|'stream'|'arrayBuffer' = 'text') {
+		console.log('readFile: ' + p);
 
-		const hFile = await this.getFileHandle(ps);
+		const hFile = await this.getFileHandle(p);
 		if (null !== hFile) {
 			const file: File = await hFile.getFile();
-			return await Fsa.#readFileAs(file, as);
+			return await FileSystem.#readAs(file, as);
 		}
 		return null;
 	}
 
-	static async #readFileAs(file: File, as: 'text'|'stream'|'buffer') {
-		let ret = null;
-		if ('text' === as) {
-			ret = await file.text();
-		} else if ('stream' === as) {
-			ret = file.stream();
-		} else if ('buffer' === as) {
-			ret = await file.arrayBuffer();
-		}
-		return ret;
-	}
-
-	async writeFile(ps: string[], data: any): Promise<boolean> {
-		console.log('writeFile: ' + ps.join('/'));
+	async writeFile(p: Path, data: any): Promise<boolean> {
+		console.log('writeFile: ' + p);
 
 		let res = false;
-		const hFile = await this.getFileHandle(ps, { create: true });
+		const hFile = await this.getFileHandle(p, { create: true });
 		if (null !== hFile) {
 			res = true;
 			const w = await hFile.createWritable();
@@ -159,8 +124,8 @@ export default class Fsa {
 		return res;
 	}
 
-	async copyFile(from: string[], to: string[], as: 'text'|'stream'|'buffer' = 'text') {
-		console.log('copyFile: ' + from.join('/') + ' -> ' + to.join('/'));
+	async copyFile(from: Path, to: Path, as: 'text'|'stream'|'arrayBuffer' = 'text') {
+		console.log('copyFile: ' + from + ' -> ' + to);
 
 		const data = await this.readFile(from, as);
 		if (null !== data) {
@@ -173,13 +138,13 @@ export default class Fsa {
 	// -------------------------------------------------------------------------
 
 
-	async exists(ps: string[]) {
-		const last = ps.at(-1) ?? '';
-		const hDir = await this.getDirectoryHandle(ps.slice(0, -1));
+	async exists(p: Path): Promise<boolean> {
+		const bn = p.baseName();
+		const hDir = await this.getDirectoryHandle(p.parent());
 
 		if (null !== hDir) {
 			for await (const e of hDir.values()) {
-				if (e.name === last) {
+				if (e.name === bn) {
 					return true;
 				}
 			}
@@ -187,20 +152,99 @@ export default class Fsa {
 		return false;
 	}
 
-	async mkdir(ps: string[]) {
-		return await this.getDirectoryHandle(ps, { create: true });
+	async makeDirectory(p: Path): Promise<FileSystemDirectoryHandle|null> {
+		return await this.getDirectoryHandle(p, { create: true });
 	}
 
-	async rmdir(ps: string[]): Promise<boolean> {
-		const last = ps.at(-1) ?? '';
+	async removeDirectory(p: Path): Promise<boolean> {
+		const bn = p.baseName();
 		let res = false;
 
-		const hDir = await this.getDirectoryHandle(ps.slice(0, -1));
+		const hDir = await this.getDirectoryHandle(p.parent());
 		if (null !== hDir) {
 			res = true;
-			await hDir.removeEntry(last, { recursive: true }).catch(e => { this.#lastError = e; res = false; });
+			await hDir.removeEntry(bn, { recursive: true }).catch(e => { this.#lastError = e; res = false; });
 		}
 		return res;
+	}
+
+}
+
+export class Path {
+
+	static splitPath(path: string) {
+		return path.split('/').map(e => e.trim()).filter(e => e.length);
+	}
+
+	static joinElements(es: string[], separator: string = '/') {
+		return es.join(separator);
+	}
+
+	static normalize(es: string[]) {
+		const ret = [];
+		for (const e of es) {
+			if ('..' === e) {
+				ret.pop();
+			} else if (e.length && '.' !== e) {
+				ret.push(e);
+			}
+		}
+		return ret;
+	}
+
+	#es: string[] = [];
+
+	constructor(val: string|string[]|null = null) {
+		if (val) {
+			if (Array.isArray(val)) {
+				this.elements = val;
+			} else {
+				this.elements = Path.splitPath(val);
+			}
+		}
+	}
+
+	get elements(): string[] {
+		return this.#es;
+	}
+
+	set elements(es: string[]) {
+		this.#es = Path.normalize(es);
+	}
+
+	get length(): number {
+		return this.#es.length;
+	}
+
+	set length(l: number) {
+		this.#es.length = l;
+	}
+
+	toString(separator: string = '/'): string {
+		return Path.joinElements(this.#es, separator);
+	}
+
+	concat(p: string|Path): Path {
+		return new Path(this.#es.concat(typeof p === 'string' ? Path.splitPath(p) : p.#es));
+	}
+
+	parent(): Path {
+		return new Path(this.#es.slice(0, -1));
+	}
+
+	baseName(ext: string|null = null) {
+		const ret = this.#es.at(-1) ?? '';
+		if (ext && ret.endsWith(ext)) {
+			return ret.slice(0, -ext.length);
+		}
+		return ret;
+	}
+
+	extName() {
+		const ret = this.#es.at(-1) ?? '';
+		const ms = ret.match(/^(.+?)(\.[^.]+)?$/) ?? [];
+		const [,, ext] = ms.map(m => m ?? '');
+		return ext;
 	}
 
 }
