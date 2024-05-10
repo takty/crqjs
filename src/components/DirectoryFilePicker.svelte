@@ -3,8 +3,13 @@
 	 * Directory File Picker
 	 *
 	 * @author Takuto Yanagida
-	 * @version 2024-05-02
+	 * @version 2024-05-10
 	 */
+
+	import { Button } from "$lib/components/ui/button";
+	import { Input } from "$lib/components/ui/input";
+	import { Label } from "$lib/components/ui/label";
+	// import * as Select from "$lib/components/ui/select";
 
 	import { createEventDispatcher } from "svelte";
 	const dispatch = createEventDispatcher();
@@ -44,117 +49,64 @@
 	}
 </script>
 
-<dialog bind:this={dialog}>
-	<div class="inner">
-		<div class="message">{message}</div>
+<dialog bind:this={dialog} class="border bg-background p-6 shadow-lg sm:rounded-lg">
+	<div class="inner grid gap-6">
+		<div class="font-bold">{message}</div>
 
-		<div class="step">
+		<div class="step grid gap-4 items-start auto-cols-auto">
 			<div>1. Select a project folder</div>
-			<button on:click={selectFolder}>Select Folder...</button>
+			<Button class="w-full" variant="secondary" on:click={selectFolder}>Select Folder...</Button>
 
-			<div class="selected">
-				Current Folder:
-				<div>
+			<div class="col-span-2 flex gap-4 w-full ps-4 items-center mb-4">
+				<Label for="selected">Current Folder:</Label>
+				<div id="selected" class="grow leading-5 py-1 w-64 min-h-8 border-b border-gray-500 border-dashed">
 					{#if hDir}{hDir.name}{/if}
 				</div>
 			</div>
 
 			<div>2. Select a file from the folder</div>
+			<!-- {#if hFns.length === 0}
+			<Select.Root bind:selected={curIdx} portal={null} disabled>
+				<Select.Trigger>
+					<Select.Value placeholder="Select a file" />
+				</Select.Trigger>
+			</Select.Root>
+			{:else}
+			<Select.Root bind:selected={curIdx} portal={null}>
+				<Select.Trigger>
+					<Select.Value />
+				</Select.Trigger>
+				<Select.Content>
+					{#each hFns as hFn, i}
+					<Select.Item value={i}>{hFn.name}</Select.Item>
+					{/each}
+				</Select.Content>
+			</Select.Root>
+			{/if} -->
 			{#if hFns.length === 0}
-				<select disabled>
+				<select class="w-full flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" disabled>
 					<option>No files</option>
 				</select>
 			{:else}
-				<select bind:value={curIdx}>
+				<select class="w-full flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" bind:value={curIdx}>
 					{#each hFns as hFn, i}
 						<option value={i}>{hFn.name}</option>
 					{/each}
 				</select>
 			{/if}
 
-			<div class="file-name">
-				File Name:
-				<input type="text" bind:value={newFile} />
+			<div class="col-span-2 flex gap-4 w-full ps-4 items-center">
+				<Label for="file-name">File Name:</Label>
+				<Input class="grow py-1 w-64 min-h-8 leading-5" id="file-name" type="text" bind:value={newFile} />
 			</div>
 		</div>
 
-		<div class="action">
-			<button on:click={open} disabled={hFns.length === 0}>Open</button>
-			<button on:click={cancel}>Cancel</button>
+		<div class="flex justify-end gap-4">
+			<Button class="min-w-24" variant="secondary" on:click={open} disabled={hFns.length === 0}>Open</Button>
+			<Button class="min-w-24" variant="secondary" on:click={cancel}>Cancel</Button>
 		</div>
 	</div>
 </dialog>
 
 <style>
-	dialog {
-		border: 1px solid #777;
-	}
-	button,
-	select {
-		padding: 0.5rem 1rem;
-	}
-	.inner {
-		display: grid;
-		gap: 1.5rem;
-	}
-	.message {
-		font-weight: bold;
-	}
-	.step {
-		display: grid;
-		gap: 1rem;
-		grid-template-columns: auto auto;
-		justify-items: start;
-
-		& :is(button, select) {
-			width: 100%;
-		}
-	}
-	.selected {
-		grid-area: 2/1/3/3;
-
-		display: flex;
-		gap: 1rem;
-		width: 100%;
-
-		margin-block-end: 1rem;
-		padding-inline-start: 1rem;
-
-		& div {
-			flex-grow: 1;
-			border-block-end: 1px dashed #777;
-			line-height: 1.25;
-			padding-block: 0.25rem;
-
-			width: 16rem;
-			min-height: 2rem;
-		}
-	}
-	.file-name {
-		grid-area: 4/1/5/3;
-
-		display: flex;
-		gap: 1rem;
-		width: 100%;
-
-		padding-inline-start: 1rem;
-
-		& input {
-			flex-grow: 1;
-			line-height: 1.25;
-			padding-block: 0.25rem;
-
-			width: 16rem;
-			min-height: 2rem;
-		}
-	}
-	.action {
-		display: flex;
-		justify-content: flex-end;
-		gap: 1rem;
-
-		& button {
-			min-width: 6rem;
-		}
-	}
 </style>

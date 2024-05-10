@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Button } from "$lib/components/ui/button";
 	import * as DropdownMenu  from "$lib/components/ui/dropdown-menu/index.js";
-    import type { ButtonEventHandler } from "bits-ui";
+	import type { ButtonEventHandler } from "bits-ui";
 
 	export let handler: ((id: string) => void)|null = null;
 
