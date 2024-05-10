@@ -5,7 +5,7 @@
  * @version 2024-05-09
  */
 
-import { FileSystem, Path } from './fsa.js';
+import { FileSystem, Path } from '../lib/fsa.js';
 import extractDeclarations from './custom-declaration.js';
 import { exportAsLibrary, readAsLibrary } from './simple-library.js';
 
