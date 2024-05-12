@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Button } from "$lib/components/ui/button";
-	import * as DropdownMenu  from "$lib/components/ui/dropdown-menu/index.js";
 	import type { ButtonEventHandler } from "bits-ui";
+	import SideMenu from "./SideMenu.svelte";
 
 	export let handler: ((id: string) => void)|null = null;
 
@@ -12,21 +12,8 @@
 	}
 </script>
 
-<div class="container flex items-start justify-between items-center px-4 py-4">
-	<DropdownMenu.Root>
-		<DropdownMenu.Trigger asChild let:builder>
-			<Button variant="secondary" builders={[builder]}>
-				<span class="sr-only">Actions</span>
-				<!-- <DotsHorizontal class="h-4 w-4" /> -->
-			</Button>
-		</DropdownMenu.Trigger>
-		<DropdownMenu.Content align="end">
-			<DropdownMenu.Item>
-				Save as library
-			</DropdownMenu.Item>
-			<DropdownMenu.Separator />
-		</DropdownMenu.Content>
-	</DropdownMenu.Root>
+<div class="container flex items-start justify-between items-center px-4 py-4 gap-2">
+	<SideMenu />
 
 	<h2 class="text-lg font-semibold">Crqjs</h2>
 
