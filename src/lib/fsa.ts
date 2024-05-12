@@ -2,8 +2,10 @@
  * File System Access
  *
  * @author Takuto Yanagida
- * @version 2024-05-09
+ * @version 2024-05-12
  */
+
+import { Path } from "./path";
 
 export class FileSystem {
 
@@ -33,12 +35,16 @@ export class FileSystem {
 	async getFileHandle(p: Path, options = {}): Promise<FileSystemFileHandle|null> {
 		console.log('getFileHandle: ' + p);
 
-		if (p.length) {
-			const bn = p.baseName();
-			const hDir = await this.getDirectoryHandle(p.parent(), options);
-			if (null !== hDir) {
-				return await hDir.getFileHandle(bn, options).catch(e => { this.#lastError = e; return null; });
-			}
+		if (!p.isAbsolute() || '' === p.name()) {
+			return null;
+		}
+		const name = p.name();
+		// console.log('getFileHandle ' + name);
+		// console.log('getFileHandle ' + p.parent().toString());
+		const hDir = await this.getDirectoryHandle(p.parent(), options);
+		// console.log('getFileHandle ' + hDir);
+		if (null !== hDir) {
+			return await hDir.getFileHandle(name, options).catch(e => { this.#lastError = e; return null; });
 		}
 		return null;
 	}
@@ -46,14 +52,24 @@ export class FileSystem {
 	async getDirectoryHandle(p: Path, options = {}): Promise<FileSystemDirectoryHandle|null> {
 		console.log('getDirectoryHandle: ' + p);
 
-		let hDir: FileSystemDirectoryHandle|null = this.#hRoot;
-		for (const e of p.elements) {
-			hDir = await hDir.getDirectoryHandle(e, options).catch(e => { this.#lastError = e; return null; });
-			if (null === hDir) {
-				return null;
+		if (!p.isAbsolute()) {
+			return null;
+		}
+		const hDirs: FileSystemDirectoryHandle[] = [this.#hRoot];
+		// let hDir: FileSystemDirectoryHandle|null = this.#hRoot;
+
+		for (const s of p.segments().slice(1)) {
+			if ('..' === s) {
+				hDirs.pop();
+			} else {
+				let hDir = await hDirs.at(-1)?.getDirectoryHandle(s, options).catch(e => { this.#lastError = e; return null; }) ?? null;
+				if (null === hDir) {
+					return null;
+				}
+				hDirs.push(hDir);
 			}
 		}
-		return hDir;
+		return hDirs.at(-1) ?? null;;
 	}
 
 
@@ -115,6 +131,7 @@ export class FileSystem {
 
 		let res = false;
 		const hFile = await this.getFileHandle(p, { create: true });
+		// console.log('writeFile ' + hFile);
 		if (null !== hFile) {
 			res = true;
 			const w = await hFile.createWritable();
@@ -139,7 +156,7 @@ export class FileSystem {
 
 
 	async exists(p: Path): Promise<boolean> {
-		const bn = p.baseName();
+		const bn = p.name();
 		const hDir = await this.getDirectoryHandle(p.parent());
 
 		if (null !== hDir) {
@@ -157,7 +174,7 @@ export class FileSystem {
 	}
 
 	async removeDirectory(p: Path): Promise<boolean> {
-		const bn = p.baseName();
+		const bn = p.name();
 		let res = false;
 
 		const hDir = await this.getDirectoryHandle(p.parent());
@@ -166,85 +183,6 @@ export class FileSystem {
 			await hDir.removeEntry(bn, { recursive: true }).catch(e => { this.#lastError = e; res = false; });
 		}
 		return res;
-	}
-
-}
-
-export class Path {
-
-	static splitPath(path: string) {
-		return path.split('/').map(e => e.trim()).filter(e => e.length);
-	}
-
-	static joinElements(es: string[], separator: string = '/') {
-		return es.join(separator);
-	}
-
-	static normalize(es: string[]) {
-		const ret = [];
-		for (const e of es) {
-			if ('..' === e) {
-				ret.pop();
-			} else if (e.length && '.' !== e) {
-				ret.push(e);
-			}
-		}
-		return ret;
-	}
-
-	#es: string[] = [];
-
-	constructor(val: string|string[]|null = null) {
-		if (val) {
-			if (Array.isArray(val)) {
-				this.elements = val;
-			} else {
-				this.elements = Path.splitPath(val);
-			}
-		}
-	}
-
-	get elements(): string[] {
-		return this.#es;
-	}
-
-	set elements(es: string[]) {
-		this.#es = Path.normalize(es);
-	}
-
-	get length(): number {
-		return this.#es.length;
-	}
-
-	set length(l: number) {
-		this.#es.length = l;
-	}
-
-	toString(separator: string = '/'): string {
-		return Path.joinElements(this.#es, separator);
-	}
-
-	concat(p: string|Path): Path {
-		return new Path(this.#es.concat(typeof p === 'string' ? Path.splitPath(p) : p.#es));
-	}
-
-	parent(): Path {
-		return new Path(this.#es.slice(0, -1));
-	}
-
-	baseName(ext: string|null = null) {
-		const ret = this.#es.at(-1) ?? '';
-		if (ext && ret.endsWith(ext)) {
-			return ret.slice(0, -ext.length);
-		}
-		return ret;
-	}
-
-	extName() {
-		const ret = this.#es.at(-1) ?? '';
-		const ms = ret.match(/^(.+?)(\.[^.]+)?$/) ?? [];
-		const [,, ext] = ms.map(m => m ?? '');
-		return ext;
 	}
 
 }
