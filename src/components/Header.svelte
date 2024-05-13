@@ -1,26 +1,29 @@
 <script lang="ts">
 	import { Button } from "$lib/components/ui/button";
 	import type { ButtonEventHandler } from "bits-ui";
-	import SideMenu from "./SideMenu.svelte";
+	import Menubar from "./Menubar.svelte";
+
+	import {
+		HardDriveDownload,
+		Play,
+	} from "lucide-svelte";
 
 	export let handler: ((id: string) => void)|null = null;
 
 	const el = (e: ButtonEventHandler<MouseEvent>) => {
 		if ('function' === typeof handler) {
-			handler((e.target as Element).id ?? '');
+			handler((e.target as HTMLElement).dataset.cmd ?? '');
 		}
 	}
 </script>
 
-<div class="container flex items-start justify-between items-center px-4 py-4 gap-2">
-	<SideMenu />
+<div class="container flex flex-col">
+	<div class="flex items-center gap-2">
+		<Menubar handler={handler} />
 
-	<h2 class="text-lg font-semibold">Crqjs</h2>
-
-	<div class="ml-auto flex w-full space-x-2 sm:justify-end">
-		<Button variant="secondary" on:click={el} id="open">Open...</Button>
-		<Button variant="secondary" on:click={el} id="save">Save</Button>
-		<Button variant="secondary" on:click={el} id="save-as">Save As...</Button>
-		<Button variant="secondary" on:click={el} id="run">Run</Button>
+		<div class="ms-auto flex h-10 items-center space-x-1 py-1">
+			<Button class="h-8" size="sm" variant="ghost" on:click={el} data-cmd="save"><HardDriveDownload class="h-4 w-4"/></Button>
+			<Button class="h-8" size="sm" variant="ghost" on:click={el} data-cmd="run"><Play class="h-4 w-4"/></Button>
+		</div>
 	</div>
 </div>

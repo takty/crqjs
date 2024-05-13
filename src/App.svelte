@@ -99,7 +99,7 @@
 			case 'save': save(); break;
 			case 'save-as': saveAs(); break;
 			case 'run': await runCode(); break;
-			case 'save-as-library': saveAsLibrary(); break;
+			case 'export-library': saveAsLibrary(); break;
 		}
 	}
 </script>
