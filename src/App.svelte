@@ -3,7 +3,7 @@
 	import { FsaPath } from "$lib/fsa-path.js";
 	import Exporter from './scripts/exporter.js';
 	import extractFunction from './scripts/function-extractor.js';
-	import * as Resizable from "$lib/components/ui/resizable";
+	// import * as Resizable from "$lib/components/ui/resizable";
 
 	import Header from "./components/Header.svelte";
 	import Editor from "./components/Editor.svelte";
@@ -109,14 +109,16 @@
 
 	import { onMount } from 'svelte';
 	onMount(() => {
-		resize_handle.addEventListener('click', () => console.log('click'));
+		// resize_handle.addEventListener('click', () => console.log('click'));
 	})
 </script>
 
 <main class="flex flex-col h-full">
 	<Header handler={commandHandler}/>
+	<Editor bind:value={source}/>
+	<Console />
 
-	<Resizable.PaneGroup direction="vertical">
+	<!-- <Resizable.PaneGroup direction="vertical">
 		<Resizable.Pane class="flex">
 			<Editor bind:value={source}/>
 		</Resizable.Pane>
@@ -124,7 +126,7 @@
 		<Resizable.Pane defaultSize={0}>
 			<Console />
 		</Resizable.Pane>
-	</Resizable.PaneGroup>
+	</Resizable.PaneGroup> -->
 
 	<div class="status-bar"></div>
 
